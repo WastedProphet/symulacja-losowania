@@ -9,13 +9,14 @@ let HOLE_WIDTH = (BALL_DIAMETER + 5 * window.BALLS_PER_HOLE);
 const SEPARATOR_WIDTH = 4;
 const SEPARATOR_HEIGHT = BALL_DIAMETER;
 
+// Dynamiczne wyliczanie promienia koła oraz bezpiecznej szerokości symulacji
+let ringRadius = Math.max(80, window.BALL_COUNT * 2);
+let minWorldWidthForRing = (ringRadius * 2) + 100;
+
 let HOLES_TOTAL_WIDTH = (window.HOLE_COUNT * HOLE_WIDTH) + ((window.HOLE_COUNT + 1) * SEPARATOR_WIDTH);
-let WORLD_WIDTH = Math.max(400, HOLES_TOTAL_WIDTH);
+let WORLD_WIDTH = Math.max(minWorldWidthForRing, HOLES_TOTAL_WIDTH);
 let HOLES_OFFSET_X = (WORLD_WIDTH - HOLES_TOTAL_WIDTH) / 2;
 const WORLD_HEIGHT = 2000;
-
-let calculatedRadius = Math.sqrt((window.BALL_COUNT + 10) / 0.8) * BALL_RADIUS;
-let globalRingRadius = Math.max(20, Math.min(calculatedRadius, (WORLD_WIDTH / 2) - 10));
 
 const config = {
     type: Phaser.WEBGL,
@@ -27,8 +28,8 @@ const config = {
         default: 'matter',
         matter: {
             gravity: { y: 1 },
-            positionIterations: 24,
-            velocityIterations: 24,
+            positionIterations: 24, // Podwyższona precyzja
+            velocityIterations: 24, // Podwyższona precyzja
             debug: false
         }
     },
@@ -44,6 +45,7 @@ let mainCamera;
 let centrifugeParts = [];
 let balls = [];
 let isPhaseOne = true;
+let phaseOneStartTime = 0;
 let phaseTwoStartTime = 0;
 let occupiedHoles = {};
 let separatorTips = [];
@@ -52,11 +54,14 @@ function create() {
     mainCamera = this.cameras.main;
 
     const graphics = this.add.graphics();
+    
+    // Tekstura kulki
     graphics.fillStyle(0xffffff, 1);
     graphics.fillCircle(BALL_RADIUS, BALL_RADIUS, BALL_RADIUS);
     graphics.generateTexture('ballBase', BALL_DIAMETER, BALL_DIAMETER);
     graphics.clear();
 
+    // Tekstura separatora dołka
     graphics.fillStyle(0x3FC1C9, 1);
     graphics.fillRect(0, 0, SEPARATOR_WIDTH, SEPARATOR_HEIGHT);
     graphics.fillStyle(0x99FFFF, 1);
@@ -64,19 +69,27 @@ function create() {
     graphics.generateTexture('separatorBase', SEPARATOR_WIDTH, SEPARATOR_HEIGHT);
     graphics.clear();
 
-    const ringRadius = Math.min(250, (WORLD_WIDTH / 2) - 40);
-
+    // Tekstura widocznego koła pralki
     graphics.lineStyle(20, 0x3FC1C9, 1);
     graphics.strokeCircle(ringRadius + 10, ringRadius + 10, ringRadius);
     graphics.generateTexture('ringDonut', (ringRadius * 2) + 20, (ringRadius * 2) + 20);
     graphics.clear();
+    
+    // Pogrubiony uszczelniacz ścian wirówki przeciwko tunelowaniu
+    graphics.fillStyle(0x3FC1C9, 1);
+    graphics.fillRect(0, 0, 120, 40);
+    graphics.generateTexture('ringBase', 120, 40);
+    graphics.clear();
 
+    // Kontur klatki
     const arenaFrame = this.add.graphics();
     arenaFrame.lineStyle(4, 0x3FC1C9, 1);
     arenaFrame.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
+    // Klatka fizyczna świata
     this.matter.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 50, true, true, true, true);
 
+    // Obsługa sterowania widokiem
     this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
         let newZoom = mainCamera.zoom - (deltaY * 0.001);
         mainCamera.zoom = Phaser.Math.Clamp(newZoom, 0.05, 5);
@@ -94,6 +107,7 @@ function create() {
         resetCameraView(this);
     });
 
+    // Generowanie dołków na dole z offsetem centrującym
     for (let i = 0; i <= window.HOLE_COUNT; i++) {
         let x = HOLES_OFFSET_X + (i * HOLE_WIDTH) + (i * SEPARATOR_WIDTH) + (SEPARATOR_WIDTH / 2);
         let y = WORLD_HEIGHT - (SEPARATOR_HEIGHT / 2);
@@ -102,15 +116,15 @@ function create() {
         separatorTips.push({ x: x, y: WORLD_HEIGHT - SEPARATOR_HEIGHT });
     }
 
+    // Konstrukcja uszczelnionej wirówki z mocnym tarciem
     const centerX = WORLD_WIDTH / 2;
     const centerY = WORLD_HEIGHT / 3;
-    
     let parts = [];
     for (let i = 0; i < 60; i++) {
         let angle = (Math.PI * 2 / 60) * i;
         let x = Math.cos(angle) * ringRadius;
         let y = Math.sin(angle) * ringRadius;
-        parts.push(Phaser.Physics.Matter.Matter.Bodies.rectangle(x, y, 40, 30, { angle: angle, friction: 1.0 }));
+        parts.push(Phaser.Physics.Matter.Matter.Bodies.rectangle(x, y, 120, 40, { angle: angle, friction: 1.0 }));
     }
     
     let ringBody = Phaser.Physics.Matter.Matter.Body.create({
@@ -131,13 +145,17 @@ function create() {
 
     centrifugeParts.push(centrifugeSprite);
 
-    let maxOffset = Math.max(0, ringRadius - BALL_RADIUS - 10);
     const namesOverlay = document.getElementById('names-overlay');
     if (namesOverlay) namesOverlay.innerHTML = '';
 
+    // Okrągły, zabezpieczony algorytm spawnu
+    let maxOffset = Math.max(0, ringRadius - BALL_RADIUS - 10);
     for(let i = 0; i < window.BALL_COUNT; i++) {
-        let offsetX = Phaser.Math.Between(-maxOffset, maxOffset);
-        let offsetY = Phaser.Math.Between(-maxOffset, maxOffset);
+        let spawnAngle = Math.random() * Math.PI * 2;
+        let spawnDist = Math.random() * maxOffset;
+        let offsetX = Math.cos(spawnAngle) * spawnDist;
+        let offsetY = Math.sin(spawnAngle) * spawnDist;
+        
         let ball = this.matter.add.image(centerX + offsetX, centerY + offsetY, 'ballBase');
         
         ball.setCircle(BALL_RADIUS);
@@ -170,6 +188,7 @@ function create() {
 
     resetCameraView(this);
 
+    // Zniszczenie wirówki po 3 sekundach
     this.time.delayedCall(3000, () => {
         isPhaseOne = false;
         
@@ -196,16 +215,54 @@ function resetCameraView(scene) {
 }
 
 function update(time, delta) {
+    const centerX = WORLD_WIDTH / 2;
+    const centerY = WORLD_HEIGHT / 3;
+
+    if (phaseOneStartTime === 0) {
+        phaseOneStartTime = time;
+    }
+
     if (isPhaseOne) {
         if (centrifugeParts.length > 0) {
             let ring = centrifugeParts[0];
             ring.setAngularVelocity(0.20);
         }
+        
+        balls.forEach(ball => {
+            // Chaos w wirówce
+            if(Math.random() > 0.8) {
+                ball.applyForce({ 
+                    x: Phaser.Math.Between(-1, 1) * 0.002, 
+                    y: Phaser.Math.Between(-1, 1) * 0.002 
+                });
+            }
+            
+            // LIMITER PRĘDKOŚCI - Zapobiega tunelowaniu przez ściany
+            let velX = ball.body.velocity.x;
+            let velY = ball.body.velocity.y;
+            let speed = Math.sqrt(velX * velX + velY * velY);
+            if (speed > 15) {
+                ball.setVelocity((velX / speed) * 15, (velY / speed) * 15);
+            }
+
+            // STRAŻNIK TELEPORTUJĄCY - Przez pierwsze 2 sekundy zawraca wyciekające kulki
+            if (time - phaseOneStartTime < 2000) {
+                let dx = ball.x - centerX;
+                let dy = ball.y - centerY;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > ringRadius - BALL_RADIUS + 10) {
+                    ball.setPosition(centerX, centerY);
+                    ball.setVelocity(0, 0);
+                }
+            }
+        });
+
     } else {
         if (phaseTwoStartTime === 0) {
             phaseTwoStartTime = time;
         }
 
+        // ZAAWANSOWANY ELEKTROMAGNES (Piłka vs Piłka)
         for (let i = 0; i < balls.length; i++) {
             for (let j = i + 1; j < balls.length; j++) {
                 let ballA = balls[i];
@@ -229,6 +286,7 @@ function update(time, delta) {
             }
         }
 
+        // ODPYCHANIE OD CZUBKÓW SEPARATORÓW
         balls.forEach(ball => {
             if (ball.body.isLocked) return;
 
@@ -256,6 +314,7 @@ function update(time, delta) {
         let timeElapsed = time - phaseTwoStartTime;
         let currentActivationDist = 55 + (timeElapsed * 0.315);
 
+        // LOGIKA ZASYSANIA DO DOŁKÓW
         balls.forEach(ball => {
             if (ball.body.isLocked) return;
 
@@ -356,17 +415,20 @@ function update(time, delta) {
     }
 }
 
+// Funkcja odpowiedzialna za restart z poziomu ui.js
 window.restartSimulation = function() {
     HOLE_WIDTH = (BALL_DIAMETER + 5 * window.BALLS_PER_HOLE);
+    
+    // Ponowne, poprawne przeliczenie wymiarów pralki
+    ringRadius = Math.max(80, window.BALL_COUNT * 2);
+    let minWorldWidthForRing = (ringRadius * 2) + 100;
+    
     HOLES_TOTAL_WIDTH = (window.HOLE_COUNT * HOLE_WIDTH) + ((window.HOLE_COUNT + 1) * SEPARATOR_WIDTH);
-    WORLD_WIDTH = Math.max(400, HOLES_TOTAL_WIDTH);
+    WORLD_WIDTH = Math.max(minWorldWidthForRing, HOLES_TOTAL_WIDTH);
     HOLES_OFFSET_X = (WORLD_WIDTH - HOLES_TOTAL_WIDTH) / 2;
 
-    calculatedRadius = Math.sqrt((window.BALL_COUNT + 10) / 0.8) * BALL_RADIUS;
-    globalRingRadius = Math.max(20, Math.min(calculatedRadius, (WORLD_WIDTH / 2) - 10));
-
     isPhaseOne = true;
-    phaseOneStartTime = 0;
+    phaseOneStartTime = 0; // Zresetowanie licznika teleportera
     phaseTwoStartTime = 0;
     occupiedHoles = {};
     separatorTips = [];
