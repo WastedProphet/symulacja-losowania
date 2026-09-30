@@ -117,10 +117,36 @@ button:hover {
     color: white;
 }
 
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.results-header h2 {
+    margin-bottom: 0;
+}
+
+.checkbox-label {
+    font-size: 12px;
+    color: #a0aab5;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    margin-bottom: 0;
+}
+
+.checkbox-label input {
+    cursor: pointer;
+}
+
 #results-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    padding-bottom: 20px;
 }
 
 .result-item {
@@ -152,16 +178,15 @@ button:hover {
     color: #99FFFF;
 }
 
-/* NOWE: Style dla nakładki w obszarze gry */
 #names-overlay {
     position: absolute;
     top: 20px;
-    right: 20px; /* Zawsze 20px od lewej krawędzi panelu bocznego */
+    right: 20px; 
     display: flex;
     flex-direction: column;
     gap: 8px;
     align-items: flex-end;
-    pointer-events: none; /* Pozwala na klikanie i przesuwanie kamery wskroś kontenera */
+    pointer-events: none; 
     z-index: 10;
 }
 
@@ -172,7 +197,7 @@ button:hover {
     padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
-    pointer-events: auto; /* Aktywuje kliknięcia w same przyciski nazw */
+    pointer-events: auto; 
     font-size: 16px;
     user-select: none;
     transition: opacity 0.2s, color 0.2s;
@@ -181,30 +206,4 @@ button:hover {
 
 .overlay-name:hover {
     color: #99FFFF;
-}
-
-/* NOWE: Układ nagłówka wyników i checkboxa */
-.results-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.results-header h2 {
-    margin-bottom: 0; /* Nadpisuje domyślny margines h2 z wcześniejszych reguł */
-}
-
-.checkbox-label {
-    font-size: 12px;
-    color: #a0aab5;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    margin-bottom: 0;
-}
-
-.checkbox-label input {
-    cursor: pointer;
 }
