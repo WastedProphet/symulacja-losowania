@@ -189,7 +189,7 @@ function create() {
     resetCameraView(this);
 
     // Zniszczenie wirówki po 3 sekundach
-    this.time.delayedCall(10000, () => {
+    this.time.delayedCall(3000, () => {
         isPhaseOne = false;
         
         if (centrifugeParts.length > 0) {
