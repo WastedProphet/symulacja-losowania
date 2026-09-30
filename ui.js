@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
             div.id = 'result-hole-' + i;
             div.dataset.names = '[]'; 
             div.style.display = cbShowAll.checked ? 'flex' : 'none'; 
-            div.innerHTML = `<span class="hole-num">Dołek ${i + 1}</span> <span class="ball-name"></span>`;
+            div.innerHTML = `<span class="hole-num">${i + 1}</span> <span class="ball-name"></span>`;
             resultsList.appendChild(div);
         }
 
