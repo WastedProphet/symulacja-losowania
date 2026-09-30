@@ -9,7 +9,9 @@ let HOLE_WIDTH = (BALL_DIAMETER + 5 * window.BALLS_PER_HOLE);
 const SEPARATOR_WIDTH = 4;
 const SEPARATOR_HEIGHT = BALL_DIAMETER;
 
-let ringRadius = Math.max(80, window.BALL_COUNT * 2);
+// PROPORCJONALNY PROMIĘŃ OPARTY NA POLU POWIERZCHNI (Piłki + zapas 10 miejsc)
+let calculatedRadius = Math.sqrt((window.BALL_COUNT + 10) / 0.8) * BALL_RADIUS;
+let ringRadius = Math.max(80, calculatedRadius);
 let minWorldWidthForRing = (ringRadius * 2) + 100;
 
 let HOLES_TOTAL_WIDTH = (window.HOLE_COUNT * HOLE_WIDTH) + ((window.HOLE_COUNT + 1) * SEPARATOR_WIDTH);
@@ -52,22 +54,21 @@ let separatorTips = [];
 function create() {
     mainCamera = this.cameras.main;
 
-    // --- KLUCZOWA POPRAWKA ---
-    // Bezwarunkowe czyszczenie pamięci podręcznej tekstur przed ich ponownym wygenerowaniem.
-    // Zapobiega to nakładaniu starych, małych tekstur na nowe, powiększone obiekty fizyczne.
+    // BEZWARUNKOWE CZYSZCZENIE PAMIĘCI TEKSTUR PHASERA PRZED RENDEROWANIEM
     if (this.textures.exists('ballBase')) this.textures.remove('ballBase');
     if (this.textures.exists('separatorBase')) this.textures.remove('separatorBase');
     if (this.textures.exists('ringDonut')) this.textures.remove('ringDonut');
     if (this.textures.exists('ringBase')) this.textures.remove('ringBase');
-    // -------------------------
 
     const graphics = this.add.graphics();
     
+    // Tekstura kulki
     graphics.fillStyle(0xffffff, 1);
     graphics.fillCircle(BALL_RADIUS, BALL_RADIUS, BALL_RADIUS);
     graphics.generateTexture('ballBase', BALL_DIAMETER, BALL_DIAMETER);
     graphics.clear();
 
+    // Tekstura separatora dołka
     graphics.fillStyle(0x3FC1C9, 1);
     graphics.fillRect(0, 0, SEPARATOR_WIDTH, SEPARATOR_HEIGHT);
     graphics.fillStyle(0x99FFFF, 1);
@@ -75,22 +76,27 @@ function create() {
     graphics.generateTexture('separatorBase', SEPARATOR_WIDTH, SEPARATOR_HEIGHT);
     graphics.clear();
 
+    // Tekstura widocznego koła pralki z odpowiednim zapasem (+40px), by nie ucinało grafiki przy dużych liczbach
     graphics.lineStyle(20, 0x3FC1C9, 1);
     graphics.strokeCircle(ringRadius + 20, ringRadius + 20, ringRadius);
     graphics.generateTexture('ringDonut', (ringRadius * 2) + 40, (ringRadius * 2) + 40);
     graphics.clear();
     
+    // Pogrubiony uszczelniacz ścian wirówki przeciwko tunelowaniu
     graphics.fillStyle(0x3FC1C9, 1);
     graphics.fillRect(0, 0, 120, 40);
     graphics.generateTexture('ringBase', 120, 40);
     graphics.clear();
 
+    // Kontur klatki
     const arenaFrame = this.add.graphics();
     arenaFrame.lineStyle(4, 0x3FC1C9, 1);
     arenaFrame.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
+    // Klatka fizyczna świata
     this.matter.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 50, true, true, true, true);
 
+    // Obsługa sterowania widokiem
     this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
         let newZoom = mainCamera.zoom - (deltaY * 0.001);
         mainCamera.zoom = Phaser.Math.Clamp(newZoom, 0.05, 5);
@@ -108,6 +114,7 @@ function create() {
         resetCameraView(this);
     });
 
+    // Generowanie dołków na dole z offsetem centrującym
     for (let i = 0; i <= window.HOLE_COUNT; i++) {
         let x = HOLES_OFFSET_X + (i * HOLE_WIDTH) + (i * SEPARATOR_WIDTH) + (SEPARATOR_WIDTH / 2);
         let y = WORLD_HEIGHT - (SEPARATOR_HEIGHT / 2);
@@ -116,6 +123,7 @@ function create() {
         separatorTips.push({ x: x, y: WORLD_HEIGHT - SEPARATOR_HEIGHT });
     }
 
+    // Konstrukcja uszczelnionej wirówki z mocnym tarciem
     const centerX = WORLD_WIDTH / 2;
     const centerY = WORLD_HEIGHT / 3;
     let parts = [];
@@ -147,6 +155,7 @@ function create() {
     const namesOverlay = document.getElementById('names-overlay');
     if (namesOverlay) namesOverlay.innerHTML = '';
 
+    // Okrągły, zabezpieczony algorytm spawnu
     let maxOffset = Math.max(0, ringRadius - BALL_RADIUS - 10);
     for(let i = 0; i < window.BALL_COUNT; i++) {
         let spawnAngle = Math.random() * Math.PI * 2;
@@ -186,6 +195,7 @@ function create() {
 
     resetCameraView(this);
 
+    // Zniszczenie wirówki po 3 sekundach
     this.time.delayedCall(3000, () => {
         isPhaseOne = false;
         
@@ -226,6 +236,7 @@ function update(time, delta) {
         }
         
         balls.forEach(ball => {
+            // Chaos w wirówce
             if(Math.random() > 0.8) {
                 ball.applyForce({ 
                     x: Phaser.Math.Between(-1, 1) * 0.002, 
@@ -233,6 +244,7 @@ function update(time, delta) {
                 });
             }
             
+            // LIMITER PRĘDKOŚCI - Zapobiega tunelowaniu przez ściany
             let velX = ball.body.velocity.x;
             let velY = ball.body.velocity.y;
             let speed = Math.sqrt(velX * velX + velY * velY);
@@ -240,11 +252,12 @@ function update(time, delta) {
                 ball.setVelocity((velX / speed) * 15, (velY / speed) * 15);
             }
 
+            // STRAŻNIK TELEPORTUJĄCY - Przez pierwsze 2 sekundy zawraca wyciekające kulki
             if (time - phaseOneStartTime < 2000) {
                 let dx = ball.x - centerX;
                 let dy = ball.y - centerY;
                 let dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist > ringRadius - BALL_RADIUS + 20) {
+                if (dist > ringRadius - BALL_RADIUS + 10) {
                     ball.setPosition(centerX, centerY);
                     ball.setVelocity(0, 0);
                 }
@@ -256,6 +269,7 @@ function update(time, delta) {
             phaseTwoStartTime = time;
         }
 
+        // ZAAWANSOWANY ELEKTROMAGNES (Piłka vs Piłka)
         for (let i = 0; i < balls.length; i++) {
             for (let j = i + 1; j < balls.length; j++) {
                 let ballA = balls[i];
@@ -279,6 +293,7 @@ function update(time, delta) {
             }
         }
 
+        // ODPYCHANIE OD CZUBKÓW SEPARATORÓW
         balls.forEach(ball => {
             if (ball.body.isLocked) return;
 
@@ -306,6 +321,7 @@ function update(time, delta) {
         let timeElapsed = time - phaseTwoStartTime;
         let currentActivationDist = 55 + (timeElapsed * 0.315);
 
+        // LOGIKA ZASYSANIA DO DOŁKÓW
         balls.forEach(ball => {
             if (ball.body.isLocked) return;
 
@@ -406,10 +422,13 @@ function update(time, delta) {
     }
 }
 
+// Funkcja odpowiedzialna za restart z poziomu ui.js
 window.restartSimulation = function() {
     HOLE_WIDTH = (BALL_DIAMETER + 5 * window.BALLS_PER_HOLE);
     
-    ringRadius = Math.max(80, window.BALL_COUNT * 2);
+    // Przeliczenie skali i powierzchni wirówki pod konkretną liczbę piłek
+    calculatedRadius = Math.sqrt((window.BALL_COUNT + 10) / 0.8) * BALL_RADIUS;
+    ringRadius = Math.max(80, calculatedRadius);
     let minWorldWidthForRing = (ringRadius * 2) + 100;
     
     HOLES_TOTAL_WIDTH = (window.HOLE_COUNT * HOLE_WIDTH) + ((window.HOLE_COUNT + 1) * SEPARATOR_WIDTH);
