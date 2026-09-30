@@ -5,7 +5,7 @@ body, html {
     height: 100%;
     display: flex;
     overflow: hidden;
-    background-color: #0d131a;
+    background-color: #0d131a; 
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: #e0e0e0;
 }
@@ -14,19 +14,6 @@ body, html {
     flex-grow: 1;
     height: 100%;
     position: relative;
-}
-
-#names-overlay {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    pointer-events: none;
-    z-index: 10;
-    text-align: right;
-    font-size: 16px;
 }
 
 #ui-panel {
@@ -130,28 +117,10 @@ button:hover {
     color: white;
 }
 
-.results-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.checkbox-label {
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    cursor: pointer;
-    color: #a0aab5;
-    margin-bottom: 0;
-}
-
 #results-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding-bottom: 20px;
 }
 
 .result-item {
@@ -181,4 +150,61 @@ button:hover {
 .ball-name {
     font-weight: bold;
     color: #99FFFF;
+}
+
+/* NOWE: Style dla nakładki w obszarze gry */
+#names-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px; /* Zawsze 20px od lewej krawędzi panelu bocznego */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+    pointer-events: none; /* Pozwala na klikanie i przesuwanie kamery wskroś kontenera */
+    z-index: 10;
+}
+
+.overlay-name {
+    background-color: #2a3b4c;
+    color: #ffffff;
+    font-weight: bold;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    pointer-events: auto; /* Aktywuje kliknięcia w same przyciski nazw */
+    font-size: 16px;
+    user-select: none;
+    transition: opacity 0.2s, color 0.2s;
+    box-shadow: 0px 2px 5px rgba(0,0,0,0.5);
+}
+
+.overlay-name:hover {
+    color: #99FFFF;
+}
+
+/* NOWE: Układ nagłówka wyników i checkboxa */
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.results-header h2 {
+    margin-bottom: 0; /* Nadpisuje domyślny margines h2 z wcześniejszych reguł */
+}
+
+.checkbox-label {
+    font-size: 12px;
+    color: #a0aab5;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    margin-bottom: 0;
+}
+
+.checkbox-label input {
+    cursor: pointer;
 }
