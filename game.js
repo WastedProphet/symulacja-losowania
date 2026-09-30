@@ -83,8 +83,8 @@ function create() {
     graphics.clear();
 
     graphics.lineStyle(20, 0x3FC1C9, 1);
-    graphics.strokeCircle(globalRingRadius + 10, globalRingRadius + 10, globalRingRadius); 
-    graphics.generateTexture('ringDonut', (globalRingRadius * 2) + 20, (globalRingRadius * 2) + 20);
+    graphics.strokeCircle(ringRadius + 20, ringRadius + 20, ringRadius);
+    graphics.generateTexture('ringDonut', (ringRadius * 2) + 40, (ringRadius * 2) + 40);
     graphics.clear();
 
     const arenaFrame = this.add.graphics();
