@@ -1,22 +1,24 @@
-window.BALL_COUNT = 4;
+window.BALL_COUNT = 4;                
+window.HOLE_COUNT = 4;         
 const BALL_RADIUS = 15;
-const BALL_DIAMETER = BALL_RADIUS * 2;
-window.HOLE_COUNT = 4;
-window.BALLS_PER_HOLE = 1;
-window.ballNamesArray = [];
+const BALL_DIAMETER = BALL_RADIUS * 2; 
+window.BALLS_PER_HOLE = 1;              
+window.BALL_NAMES = []; 
+window.highlightedBallName = null; 
 
-let HOLE_WIDTH = (BALL_DIAMETER + 5 * window.BALLS_PER_HOLE);
-const SEPARATOR_WIDTH = 4;
-const SEPARATOR_HEIGHT = BALL_DIAMETER;
+// POJEMNOŚĆ: Dołek rośnie w górę, nie w szerz. Zawsze 1 piłeczka szerokości.
+const HOLE_WIDTH = BALL_DIAMETER + 10;  
+const SEPARATOR_WIDTH = 4;             
+let SEPARATOR_HEIGHT = (BALL_DIAMETER * window.BALLS_PER_HOLE) + 20; 
 
-// PROPORCJONALNY PROMIĘŃ OPARTY NA POLU POWIERZCHNI (Piłki + zapas 10 miejsc)
+let HOLES_TOTAL_WIDTH = (window.HOLE_COUNT * HOLE_WIDTH) + ((window.HOLE_COUNT + 1) * SEPARATOR_WIDTH);
+
 let calculatedRadius = Math.sqrt((window.BALL_COUNT + 10) / 0.8) * BALL_RADIUS;
 let ringRadius = Math.max(80, calculatedRadius);
 let minWorldWidthForRing = (ringRadius * 2) + 100;
 
-let HOLES_TOTAL_WIDTH = (window.HOLE_COUNT * HOLE_WIDTH) + ((window.HOLE_COUNT + 1) * SEPARATOR_WIDTH);
-let WORLD_WIDTH = Math.max(minWorldWidthForRing, HOLES_TOTAL_WIDTH);
-let HOLES_OFFSET_X = (WORLD_WIDTH - HOLES_TOTAL_WIDTH) / 2;
+let WORLD_WIDTH = Math.max(minWorldWidthForRing, HOLES_TOTAL_WIDTH); 
+let HOLES_OFFSET_X = (WORLD_WIDTH - HOLES_TOTAL_WIDTH) / 2; 
 const WORLD_HEIGHT = 2000;
 
 const config = {
@@ -31,7 +33,7 @@ const config = {
             gravity: { y: 1 },
             positionIterations: 24, 
             velocityIterations: 24, 
-            debug: false
+            debug: false 
         }
     },
     scene: {
@@ -45,87 +47,100 @@ const game = new Phaser.Game(config);
 let mainCamera;
 let centrifugeParts = [];
 let balls = [];
-let isPhaseOne = true;
-let phaseOneStartTime = 0;
-let phaseTwoStartTime = 0;
-let occupiedHoles = {};
-let separatorTips = [];
+let isPhaseOne = true; 
+let phaseOneStartTime = 0; 
+let phaseTwoStartTime = 0; 
+let occupiedHoles = {}; // Rejestr ILOŚCI piłek w dołku
+let separatorTips = []; 
+
+window.onresize = () => {
+    if(game && game.scale) {
+        let newWidth = window.innerWidth - 350;
+        game.scale.resize(newWidth, window.innerHeight);
+        let scene = game.scene.scenes[0];
+        if(scene) {
+            resetCameraView(scene);
+        }
+    }
+};
 
 function create() {
     mainCamera = this.cameras.main;
-
-    // BEZWARUNKOWE CZYSZCZENIE PAMIĘCI TEKSTUR PHASERA PRZED RENDEROWANIEM
+    
+    // CZYSZCZENIE CACHE TEKSTUR (Rozwiązuje błąd nachodzenia koła)
     if (this.textures.exists('ballBase')) this.textures.remove('ballBase');
     if (this.textures.exists('separatorBase')) this.textures.remove('separatorBase');
     if (this.textures.exists('ringDonut')) this.textures.remove('ringDonut');
     if (this.textures.exists('ringBase')) this.textures.remove('ringBase');
 
     const graphics = this.add.graphics();
-    
-    // Tekstura kulki
     graphics.fillStyle(0xffffff, 1);
     graphics.fillCircle(BALL_RADIUS, BALL_RADIUS, BALL_RADIUS);
     graphics.generateTexture('ballBase', BALL_DIAMETER, BALL_DIAMETER);
     graphics.clear();
-
-    // Tekstura separatora dołka
+    
     graphics.fillStyle(0x3FC1C9, 1);
     graphics.fillRect(0, 0, SEPARATOR_WIDTH, SEPARATOR_HEIGHT);
-    graphics.fillStyle(0x99FFFF, 1);
+    graphics.fillStyle(0x99FFFF, 1); 
     graphics.fillRect(0, 0, SEPARATOR_WIDTH, 2);
     graphics.generateTexture('separatorBase', SEPARATOR_WIDTH, SEPARATOR_HEIGHT);
     graphics.clear();
 
-    // Tekstura widocznego koła pralki z odpowiednim zapasem (+40px), by nie ucinało grafiki przy dużych liczbach
     graphics.lineStyle(20, 0x3FC1C9, 1);
-    graphics.strokeCircle(ringRadius + 20, ringRadius + 20, ringRadius);
+    graphics.strokeCircle(ringRadius + 20, ringRadius + 20, ringRadius); 
     graphics.generateTexture('ringDonut', (ringRadius * 2) + 40, (ringRadius * 2) + 40);
     graphics.clear();
-    
-    // Pogrubiony uszczelniacz ścian wirówki przeciwko tunelowaniu
-    graphics.fillStyle(0x3FC1C9, 1);
-    graphics.fillRect(0, 0, 120, 40);
-    graphics.generateTexture('ringBase', 120, 40);
-    graphics.clear();
 
-    // Kontur klatki
     const arenaFrame = this.add.graphics();
     arenaFrame.lineStyle(4, 0x3FC1C9, 1);
     arenaFrame.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-    // Klatka fizyczna świata
     this.matter.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 50, true, true, true, true);
 
-    // Obsługa sterowania widokiem
     this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
         let newZoom = mainCamera.zoom - (deltaY * 0.001);
-        mainCamera.zoom = Phaser.Math.Clamp(newZoom, 0.05, 5);
+        mainCamera.zoom = Phaser.Math.Clamp(newZoom, 0.05, 5); 
     });
+    
     this.input.on('pointerdown', (pointer) => {
         if (pointer.button === 1) resetCameraView(this);
+        
+        if (pointer.button === 0 && window.highlightedBallName !== null) {
+            window.highlightedBallName = null;
+            balls.forEach(b => b.setAlpha(1));
+            if (window.updateHighlightUI) window.updateHighlightUI(null);
+        }
     });
+    
     this.input.on('pointermove', (pointer) => {
         if (!pointer.isDown || pointer.button !== 0) return;
         mainCamera.scrollX -= (pointer.x - pointer.prevPosition.x) / mainCamera.zoom;
         mainCamera.scrollY -= (pointer.y - pointer.prevPosition.y) / mainCamera.zoom;
     });
-    window.addEventListener('resize', () => {
-        game.scale.resize(window.innerWidth - 350, window.innerHeight);
-        resetCameraView(this);
-    });
 
-    // Generowanie dołków na dole z offsetem centrującym
+    // GENEROWANIE DOŁKÓW WRAZ Z NUMERACJĄ (PUNKT 3)
     for (let i = 0; i <= window.HOLE_COUNT; i++) {
         let x = HOLES_OFFSET_X + (i * HOLE_WIDTH) + (i * SEPARATOR_WIDTH) + (SEPARATOR_WIDTH / 2);
         let y = WORLD_HEIGHT - (SEPARATOR_HEIGHT / 2);
         
         let separator = this.matter.add.image(x, y, 'separatorBase', null, { isStatic: true });
         separatorTips.push({ x: x, y: WORLD_HEIGHT - SEPARATOR_HEIGHT });
+
+        // Dodawanie białych cyfr pod dołkami
+        if (i < window.HOLE_COUNT) {
+            let textX = x + (HOLE_WIDTH / 2) + (SEPARATOR_WIDTH / 2);
+            let textY = WORLD_HEIGHT + 15; 
+            this.add.text(textX, textY, (i + 1).toString(), { 
+                fontSize: '20px', 
+                fill: '#ffffff', 
+                fontStyle: 'bold' 
+            }).setOrigin(0.5, 0);
+        }
     }
 
-    // Konstrukcja uszczelnionej wirówki z mocnym tarciem
     const centerX = WORLD_WIDTH / 2;
     const centerY = WORLD_HEIGHT / 3;
+    
     let parts = [];
     for (let i = 0; i < 60; i++) {
         let angle = (Math.PI * 2 / 60) * i;
@@ -152,55 +167,39 @@ function create() {
 
     centrifugeParts.push(centrifugeSprite);
 
-    const namesOverlay = document.getElementById('names-overlay');
-    if (namesOverlay) namesOverlay.innerHTML = '';
-
-    // Okrągły, zabezpieczony algorytm spawnu
     let maxOffset = Math.max(0, ringRadius - BALL_RADIUS - 10);
+
     for(let i = 0; i < window.BALL_COUNT; i++) {
-        let spawnAngle = Math.random() * Math.PI * 2;
-        let spawnDist = Math.random() * maxOffset;
-        let offsetX = Math.cos(spawnAngle) * spawnDist;
-        let offsetY = Math.sin(spawnAngle) * spawnDist;
-        
+        let randomAngle = Math.random() * Math.PI * 2;
+        let randomDist = Math.sqrt(Math.random()) * maxOffset;
+        let offsetX = Math.cos(randomAngle) * randomDist;
+        let offsetY = Math.sin(randomAngle) * randomDist;
+
         let ball = this.matter.add.image(centerX + offsetX, centerY + offsetY, 'ballBase');
         
         ball.setCircle(BALL_RADIUS);
         ball.setFriction(0.005);
-        ball.setFrictionAir(0.015);
-        ball.setBounce(0.5);
+        ball.setFrictionAir(0.015); 
+        ball.setBounce(0.5); 
+        ball.setTint(Math.random() * 0xffffff);
         
-        let ballName = window.ballNamesArray[i] || '';
-        let colorHex = Phaser.Display.Color.RandomRGB(100, 255).color;
+        ball.body.label = 'ball'; 
+        ball.body.isLocked = false; 
+        ball.claimedHole = null; 
         
-        if (ballName && namesOverlay) {
-            let nameTag = document.createElement('div');
-            nameTag.innerText = ballName;
-            nameTag.style.color = '#' + colorHex.toString(16).padStart(6, '0');
-            nameTag.style.fontWeight = 'bold';
-            namesOverlay.appendChild(nameTag);
-        }
-
-        ball.setTint(colorHex);
-        ball.originalColor = '#' + colorHex.toString(16).padStart(6, '0');
-        ball.ballName = ballName;
-        ball.ballIndex = i;
-        
-        ball.body.label = 'ball';
-        ball.body.isLocked = false;
-        ball.claimedHole = null;
+        ball.ballName = window.BALL_NAMES[i] || ''; 
+        ball.isReported = false; 
         
         balls.push(ball);
     }
 
     resetCameraView(this);
 
-    // Zniszczenie wirówki po 3 sekundach
     this.time.delayedCall(3000, () => {
         isPhaseOne = false;
         
         if (centrifugeParts.length > 0) {
-            centrifugeParts[0].destroy();
+            centrifugeParts[0].destroy(); 
         }
         centrifugeParts = [];
         
@@ -214,29 +213,52 @@ function create() {
 
 function resetCameraView(scene) {
     const zoomX = game.scale.width / WORLD_WIDTH;
-    const zoomY = game.scale.height / WORLD_HEIGHT;
-    const optimalZoom = Math.min(zoomX, zoomY) * 0.95;
+    const topOfRing = (WORLD_HEIGHT / 3) - ringRadius - 50;
+    const bottomOfHoles = WORLD_HEIGHT + 60; 
+    const actionHeight = bottomOfHoles - topOfRing;
+    
+    const zoomY = game.scale.height / actionHeight;
+    const optimalZoom = Math.min(zoomX, zoomY) * 0.95; 
+    const centerY = topOfRing + (actionHeight / 2);
 
-    mainCamera.pan(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, 500, 'Sine.easeInOut');
-    mainCamera.zoomTo(optimalZoom, 500, 'Sine.easeInOut');
+    scene.cameras.main.pan(WORLD_WIDTH / 2, centerY, 500, 'Sine.easeInOut');
+    scene.cameras.main.zoomTo(optimalZoom, 500, 'Sine.easeInOut');
 }
 
-function update(time, delta) {
-    const centerX = WORLD_WIDTH / 2;
-    const centerY = WORLD_HEIGHT / 3;
-
-    if (phaseOneStartTime === 0) {
-        phaseOneStartTime = time;
+// Globalna funkcja odpowiedzialna za zaciemnianie z poziomu HTML (PUNKT 2)
+window.toggleHighlight = function(name) {
+    if (window.highlightedBallName === name) {
+        window.highlightedBallName = null;
+    } else {
+        window.highlightedBallName = name;
     }
+    
+    balls.forEach(b => {
+        if (window.highlightedBallName === null) {
+            b.setAlpha(1);
+        } else {
+            b.setAlpha(b.ballName === window.highlightedBallName ? 1 : 0.4);
+        }
+    });
 
+    if (window.updateHighlightUI) {
+        window.updateHighlightUI(window.highlightedBallName);
+    }
+};
+
+function update(time, delta) {
     if (isPhaseOne) {
+        if (phaseOneStartTime === 0) phaseOneStartTime = time;
+
+        const centerX = WORLD_WIDTH / 2;
+        const centerY = WORLD_HEIGHT / 3;
+
         if (centrifugeParts.length > 0) {
             let ring = centrifugeParts[0];
-            ring.setAngularVelocity(0.20);
+            ring.setAngularVelocity(0.20); 
         }
-        
+
         balls.forEach(ball => {
-            // Chaos w wirówce
             if(Math.random() > 0.8) {
                 ball.applyForce({ 
                     x: Phaser.Math.Between(-1, 1) * 0.002, 
@@ -244,7 +266,6 @@ function update(time, delta) {
                 });
             }
             
-            // LIMITER PRĘDKOŚCI - Zapobiega tunelowaniu przez ściany
             let velX = ball.body.velocity.x;
             let velY = ball.body.velocity.y;
             let speed = Math.sqrt(velX * velX + velY * velY);
@@ -252,24 +273,19 @@ function update(time, delta) {
                 ball.setVelocity((velX / speed) * 15, (velY / speed) * 15);
             }
 
-            // STRAŻNIK TELEPORTUJĄCY - Przez pierwsze 2 sekundy zawraca wyciekające kulki
             if (time - phaseOneStartTime < 2000) {
                 let dx = ball.x - centerX;
                 let dy = ball.y - centerY;
                 let dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist > ringRadius - BALL_RADIUS + 10) {
+                if (dist > ringRadius - BALL_RADIUS + 20) {
                     ball.setPosition(centerX, centerY);
                     ball.setVelocity(0, 0);
                 }
             }
         });
-
     } else {
-        if (phaseTwoStartTime === 0) {
-            phaseTwoStartTime = time;
-        }
+        if (phaseTwoStartTime === 0) phaseTwoStartTime = time;
 
-        // ZAAWANSOWANY ELEKTROMAGNES (Piłka vs Piłka)
         for (let i = 0; i < balls.length; i++) {
             for (let j = i + 1; j < balls.length; j++) {
                 let ballA = balls[i];
@@ -284,7 +300,7 @@ function update(time, delta) {
                 if (dist < 36 && dist > 0) {
                     let nx = dx / dist;
                     let ny = dy / dist;
-                    let calculatedForce = (36 - dist) * 0.001;
+                    let calculatedForce = (36 - dist) * 0.001; 
                     let force = Phaser.Math.Clamp(calculatedForce, 0, 0.015);
 
                     if (!ballA.body.isLocked) ballA.applyForce({ x: nx * force, y: ny * force });
@@ -293,7 +309,6 @@ function update(time, delta) {
             }
         }
 
-        // ODPYCHANIE OD CZUBKÓW SEPARATORÓW
         balls.forEach(ball => {
             if (ball.body.isLocked) return;
 
@@ -310,7 +325,7 @@ function update(time, delta) {
 
                         let nx = dx / dist;
                         let ny = dy / dist;
-                        let force = (30 - dist) * 0.0015;
+                        let force = (30 - dist) * 0.0015; 
                         ball.applyForce({ x: nx * force, y: ny * force - 0.002 });
                     }
                 });
@@ -319,11 +334,19 @@ function update(time, delta) {
 
         const holeTotalWidth = HOLE_WIDTH + SEPARATOR_WIDTH;
         let timeElapsed = time - phaseTwoStartTime;
-        let currentActivationDist = 55 + (timeElapsed * 0.315);
+        let currentActivationDist = 55 + (timeElapsed * 0.315); 
+        
+        let targetedCounts = {}; 
 
-        // LOGIKA ZASYSANIA DO DOŁKÓW
+        // PRZELOT 1: Kolizje, pojemność (PUNKT 5) oraz absolutna korekta (PUNKT 4)
         balls.forEach(ball => {
-            if (ball.body.isLocked) return;
+            // BEZWZGLĘDNA KOREKTA
+            if (ball.body.isLocked) {
+                if (ball.lockedTargetX !== undefined && ball.lockedTargetY !== undefined) {
+                    ball.setPosition(ball.lockedTargetX, ball.lockedTargetY);
+                }
+                return;
+            }
 
             ball.setIgnoreGravity(false);
             ball.setBounce(0.5);
@@ -332,33 +355,46 @@ function update(time, delta) {
             if (currentHoleIndex < 0) currentHoleIndex = 0;
             if (currentHoleIndex >= window.HOLE_COUNT) currentHoleIndex = window.HOLE_COUNT - 1;
 
+            let currentOccupiedCount = occupiedHoles[currentHoleIndex] || 0;
+
             if (ball.y > WORLD_HEIGHT - SEPARATOR_HEIGHT) {
-                if (!occupiedHoles[currentHoleIndex]) {
-                    occupiedHoles[currentHoleIndex] = true;
-                    ball.body.isLocked = true;
+                if (currentOccupiedCount < window.BALLS_PER_HOLE) {
+                    
+                    occupiedHoles[currentHoleIndex] = currentOccupiedCount + 1;
+                    ball.body.isLocked = true; 
+                    ball.claimedHole = null; 
 
                     let targetX = HOLES_OFFSET_X + (currentHoleIndex * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
-                    let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
+                    // Stackowanie pionowe piłek z dołu do góry
+                    let targetY = WORLD_HEIGHT - BALL_RADIUS - (currentOccupiedCount * BALL_DIAMETER) - 1; 
+
+                    ball.lockedTargetX = targetX;
+                    ball.lockedTargetY = targetY;
 
                     ball.setPosition(targetX, targetY);
-                    ball.setStatic(true);
-                    
-                    if(window.reportResult) {
-                        window.reportResult(ball.ballIndex, ball.ballName, ball.originalColor, currentHoleIndex + 1);
+                    ball.setStatic(true); 
+
+                    if (!ball.isReported) {
+                        ball.isReported = true;
+                        if (window.reportResult) window.reportResult(currentHoleIndex, ball.ballName);
                     }
-                    return;
+                    return; 
                 } else {
+                    // Odbicie tylko jeśli przepełniony
                     let kickForceX = Phaser.Math.Between(-3, 3) * 0.01;
-                    let kickForceY = -0.04;
+                    let kickForceY = -0.04; 
                     ball.applyForce({ x: kickForceX, y: kickForceY });
-                    return;
+                    ball.claimedHole = null; 
+                    return; 
                 }
             }
 
             if (ball.claimedHole !== null) {
                 let hIdx = ball.claimedHole;
-                if (occupiedHoles[hIdx]) {
-                    ball.claimedHole = null;
+                let occ = occupiedHoles[hIdx] || 0;
+                
+                if (occ >= window.BALLS_PER_HOLE) {
+                    ball.claimedHole = null; 
                 } else {
                     let targetX = HOLES_OFFSET_X + (hIdx * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
                     let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
@@ -367,24 +403,35 @@ function update(time, delta) {
                     let dist = Math.sqrt(dx * dx + dy * dy);
 
                     if (dist > currentActivationDist) {
-                        ball.claimedHole = null;
+                        ball.claimedHole = null; 
+                    } else {
+                        targetedCounts[hIdx] = (targetedCounts[hIdx] || 0) + 1; 
                     }
                 }
             }
+        });
+
+        // PRZELOT 2: Szukanie celów
+        balls.forEach(ball => {
+            if (ball.body.isLocked) return;
+            if (ball.y > WORLD_HEIGHT - SEPARATOR_HEIGHT) return; 
 
             if (ball.claimedHole === null) {
                 let closestHole = null;
                 let minDistance = currentActivationDist;
 
                 for (let i = 0; i < window.HOLE_COUNT; i++) {
-                    if (!occupiedHoles[i]) {
+                    let occ = occupiedHoles[i] || 0;
+                    let tgt = targetedCounts[i] || 0;
+
+                    if (occ + tgt < window.BALLS_PER_HOLE) {
                         let targetX = HOLES_OFFSET_X + (i * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
                         let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
                         let dx = targetX - ball.x;
                         let dy = targetY - ball.y;
                         let dist = Math.sqrt(dx * dx + dy * dy);
 
-                        if (dist < minDistance && ball.y < targetY) {
+                        if (dist < minDistance && ball.y < WORLD_HEIGHT) {
                             minDistance = dist;
                             closestHole = i;
                         }
@@ -393,6 +440,7 @@ function update(time, delta) {
 
                 if (closestHole !== null) {
                     ball.claimedHole = closestHole;
+                    targetedCounts[closestHole] = (targetedCounts[closestHole] || 0) + 1; 
                 }
             }
 
@@ -414,7 +462,7 @@ function update(time, delta) {
 
                 ball.setIgnoreGravity(true);
                 
-                let pullForce = 0.002 * intensity;
+                let pullForce = 0.002 * intensity; 
                 ball.applyForce({ x: (dx / dist) * pullForce, y: (dy / dist) * pullForce });
                 ball.setVelocityX(ball.body.velocity.x * (1 - (0.15 * intensity)));
             }
@@ -422,26 +470,25 @@ function update(time, delta) {
     }
 }
 
-// Funkcja odpowiedzialna za restart z poziomu ui.js
 window.restartSimulation = function() {
-    HOLE_WIDTH = (BALL_DIAMETER + 5 * window.BALLS_PER_HOLE);
+    SEPARATOR_HEIGHT = (BALL_DIAMETER * window.BALLS_PER_HOLE) + 20; 
+    HOLES_TOTAL_WIDTH = (window.HOLE_COUNT * HOLE_WIDTH) + ((window.HOLE_COUNT + 1) * SEPARATOR_WIDTH);
     
-    // Przeliczenie skali i powierzchni wirówki pod konkretną liczbę piłek
     calculatedRadius = Math.sqrt((window.BALL_COUNT + 10) / 0.8) * BALL_RADIUS;
     ringRadius = Math.max(80, calculatedRadius);
-    let minWorldWidthForRing = (ringRadius * 2) + 100;
-    
-    HOLES_TOTAL_WIDTH = (window.HOLE_COUNT * HOLE_WIDTH) + ((window.HOLE_COUNT + 1) * SEPARATOR_WIDTH);
+    minWorldWidthForRing = (ringRadius * 2) + 100;
+
     WORLD_WIDTH = Math.max(minWorldWidthForRing, HOLES_TOTAL_WIDTH);
     HOLES_OFFSET_X = (WORLD_WIDTH - HOLES_TOTAL_WIDTH) / 2;
 
     isPhaseOne = true;
-    phaseOneStartTime = 0; 
+    phaseOneStartTime = 0;
     phaseTwoStartTime = 0;
     occupiedHoles = {};
     separatorTips = [];
     centrifugeParts = [];
     balls = [];
+    window.highlightedBallName = null; 
 
     game.scene.scenes[0].scene.restart();
 };
