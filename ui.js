@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const STORAGE_KEY = 'lottery_templates';
 
-    // 1. ZARZĄDZANIE SZABLONAMI
     function loadTemplates() {
         const templatesRaw = localStorage.getItem(STORAGE_KEY);
         let templates = {};
@@ -82,7 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTemplateDropdown();
     });
 
-    // 2. LOGIKA WYŚWIETLANIA WYNIKÓW
     function updateVisibility() {
         const showAll = cbShowAll.checked;
         
@@ -91,26 +89,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!slot) continue;
             
             const isFilled = slot.classList.contains('filled');
-            const hasName = slot.dataset.name && slot.dataset.name !== '';
+            const namesArray = JSON.parse(slot.dataset.names || '[]');
+            const hasName = namesArray.length > 0;
 
             if (showAll) {
-                // Pokazujemy wszystko (puste i nienazwane)
                 slot.style.display = 'flex';
             } else {
-                // Pokazujemy tylko osadzone, nazwane piłki
-                if (isFilled && hasName) {
-                    slot.style.display = 'flex';
-                } else {
-                    slot.style.display = 'none';
-                }
+                slot.style.display = (isFilled && hasName) ? 'flex' : 'none';
             }
         }
     }
 
-    // Nasłuchiwanie na kliknięcie w checkbox
     cbShowAll.addEventListener('change', updateVisibility);
 
-    // 3. KOMUNIKACJA Z SILNIKIEM GRY
     btnRestart.addEventListener('click', () => {
         window.BALL_COUNT = parseInt(inputBallCount.value);
         window.HOLE_COUNT = parseInt(inputHoleCount.value);
@@ -118,20 +109,19 @@ document.addEventListener('DOMContentLoaded', () => {
         
         window.BALL_NAMES = inputBallNames.value.split('\n').map(n => n.trim()).filter(n => n);
 
+        // Generowanie dołków HTML
         resultsList.innerHTML = '';
         for(let i = 0; i < window.HOLE_COUNT; i++) {
             const div = document.createElement('div');
             div.className = 'result-item';
             div.id = 'result-hole-' + i;
-            div.dataset.name = ''; 
-            
-            // Przy generowaniu od razu uwzględniamy stan checkboxa
+            div.dataset.names = '[]'; 
             div.style.display = cbShowAll.checked ? 'flex' : 'none'; 
-            
             div.innerHTML = `<span class="hole-num">Dołek ${i + 1}</span> <span class="ball-name"></span>`;
             resultsList.appendChild(div);
         }
 
+        // Generowanie interaktywnej nakładki na grę (prawy górny róg)
         namesOverlay.innerHTML = '';
         window.BALL_NAMES.forEach(name => {
             if (!name) return;
@@ -150,20 +140,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Odbieranie sygnałów z game.js i aktualizacja DOM
+    // Odbieranie sygnałów o wpadnięciu z game.js
     window.reportResult = function(holeIndex, ballName) {
         const slot = document.getElementById('result-hole-' + holeIndex);
         if(slot) {
             slot.classList.add('filled');
+            let namesArray = JSON.parse(slot.dataset.names || '[]');
             
             if (ballName && ballName !== '') {
-                slot.querySelector('.ball-name').textContent = ballName;
-                slot.dataset.name = ballName; 
+                namesArray.push(ballName);
+                slot.dataset.names = JSON.stringify(namesArray);
+            }
+
+            if (namesArray.length > 0) {
+                slot.querySelector('.ball-name').textContent = namesArray.join(', ');
             } else {
                 slot.querySelector('.ball-name').textContent = '---'; 
             }
             
-            // Po każdym trafieniu piłki przeliczamy, czy dołek powinien zostać odsłonięty
             updateVisibility();
         }
     };
@@ -183,16 +177,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // 4. KOPIOWANIE DO SCHOWKA
     btnCopyResults.addEventListener('click', () => {
         let resultsToCopy = [];
         for (let i = 0; i < window.HOLE_COUNT; i++) {
             const slot = document.getElementById('result-hole-' + i);
             if (slot && slot.classList.contains('filled')) {
-                const name = slot.dataset.name;
-                // Kopiuje wyłacznie jeśli przypisano tekstową nazwę
-                if (name) {
-                    resultsToCopy.push(name);
+                const namesArray = JSON.parse(slot.dataset.names || '[]');
+                if (namesArray.length > 0) {
+                    resultsToCopy.push(...namesArray);
                 }
             }
         }
