@@ -10,6 +10,23 @@
     <div id="game-container">
         <!-- Niezależna nakładka HTML na nazwy piłeczek w prawym górnym rogu -->
         <div id="names-overlay"></div>
+        
+        <!-- NOWE: Elegancka prowadnica (popover) do edycji klikniętej strefy -->
+        <div id="zone-editor-popover" class="hidden">
+            <div class="popover-arrow"></div>
+            <div class="popover-header">Edytuj strefę</div>
+            <input type="text" id="ze-name" placeholder="Nazwa strefy">
+            <div class="ze-row">
+                <input type="color" id="ze-color" title="Kolor strefy">
+                <input type="number" id="ze-start" min="1" max="1000" title="Dołek początkowy">
+                <span> - </span>
+                <input type="number" id="ze-end" min="1" max="1000" title="Dołek końcowy">
+            </div>
+            <div class="ze-actions">
+                <button id="ze-save" class="primary-btn">Zapisz / Zamknij</button>
+                <button id="ze-delete" class="danger-btn">Usuń</button>
+            </div>
+        </div>
     </div>
     
     <div id="ui-panel">
@@ -17,12 +34,12 @@
         
         <div class="control-group">
             <label for="ballCount">Ilość piłeczek:</label>
-            <input type="number" id="ballCount" value="4" min="1" max="500">
+            <input type="number" id="ballCount" value="100" min="1" max="1000">
         </div>
 
         <div class="control-group">
             <label for="holeCount">Ilość dołków:</label>
-            <input type="number" id="holeCount" value="4" min="1" max="500">
+            <input type="number" id="holeCount" value="100" min="1" max="1000">
         </div>
         
         <div class="control-group">
@@ -43,13 +60,13 @@
         <div class="control-group">
             <label for="templateSelect">Wybierz szablon:</label>
             <select id="templateSelect">
-                <option value="">-- Wybierz --</option>
+                <!-- Domyślne ładowane z JS -->
             </select>
         </div>
         
         <div class="control-group">
             <label for="templateName">Nazwa nowego szablonu:</label>
-            <input type="text" id="templateName" placeholder="np. Wygrana">
+            <input type="text" id="templateName" placeholder="dowolna nazwa">
         </div>
         
         <button id="btn-save-template">Zapisz jako szablon</button>
@@ -58,7 +75,7 @@
         <hr>
 
         <div class="results-header">
-            <h2>Wyniki losowania</h2>
+            <h2>Wynik</h2>
             <label class="checkbox-label">
                 <input type="checkbox" id="cb-show-all"> Wyświetl wszystkie
             </label>
