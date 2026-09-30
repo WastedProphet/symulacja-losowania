@@ -52,6 +52,15 @@ let separatorTips = [];
 function create() {
     mainCamera = this.cameras.main;
 
+    // --- KLUCZOWA POPRAWKA ---
+    // Bezwarunkowe czyszczenie pamięci podręcznej tekstur przed ich ponownym wygenerowaniem.
+    // Zapobiega to nakładaniu starych, małych tekstur na nowe, powiększone obiekty fizyczne.
+    if (this.textures.exists('ballBase')) this.textures.remove('ballBase');
+    if (this.textures.exists('separatorBase')) this.textures.remove('separatorBase');
+    if (this.textures.exists('ringDonut')) this.textures.remove('ringDonut');
+    if (this.textures.exists('ringBase')) this.textures.remove('ringBase');
+    // -------------------------
+
     const graphics = this.add.graphics();
     
     graphics.fillStyle(0xffffff, 1);
@@ -66,8 +75,6 @@ function create() {
     graphics.generateTexture('separatorBase', SEPARATOR_WIDTH, SEPARATOR_HEIGHT);
     graphics.clear();
 
-    // POPRAWKA: Zwiększony o 20px obszar na teksturę koła. 
-    // Zapobiega obcinaniu grafiki przez silnik przy dużych rozmiarach pralki.
     graphics.lineStyle(20, 0x3FC1C9, 1);
     graphics.strokeCircle(ringRadius + 20, ringRadius + 20, ringRadius);
     graphics.generateTexture('ringDonut', (ringRadius * 2) + 40, (ringRadius * 2) + 40);
@@ -237,7 +244,6 @@ function update(time, delta) {
                 let dx = ball.x - centerX;
                 let dy = ball.y - centerY;
                 let dist = Math.sqrt(dx * dx + dy * dy);
-                // POPRAWKA: Zwiększony o 10px próg błędu teleportera
                 if (dist > ringRadius - BALL_RADIUS + 20) {
                     ball.setPosition(centerX, centerY);
                     ball.setVelocity(0, 0);
