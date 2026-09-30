@@ -237,7 +237,7 @@ window.toggleHighlight = function(name) {
         if (window.highlightedBallName === null) {
             b.setAlpha(1);
         } else {
-            b.setAlpha(b.ballName === window.highlightedBallName ? 1 : 0.4);
+            b.setAlpha(b.ballName === window.highlightedBallName ? 1 : 0.08);
         }
     });
 
