@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Symulacja Losowania</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <div id="names-overlay"></div>
+    </div>
+    
+    <div id="ui-panel">
+        <h2>Ustawienia Symulacji</h2>
+        
+        <div class="control-group">
+            <label for="ballCount">Ilość piłeczek:</label>
+            <input type="number" id="ballCount" value="4" min="1" max="500">
+        </div>
+
+        <div class="control-group">
+            <label for="holeCount">Ilość dołków:</label>
+            <input type="number" id="holeCount" value="4" min="1" max="500">
+        </div>
+        
+        <div class="control-group">
+            <label for="ballsPerHole">Pojemność dołka (ilość piłek):</label>
+            <input type="number" id="ballsPerHole" value="1" min="1" max="10">
+        </div>
+
+        <div class="control-group">
+            <label for="ballNames">Nazwy piłeczek (każda w nowej linii):</label>
+            <textarea id="ballNames" rows="5" placeholder="MG&#10;TM&#10;FG"></textarea>
+        </div>
+        
+        <button id="btn-restart" class="primary-btn">Uruchom symulację</button>
+
+        <hr>
+
+        <h2>Szablony Ustawień</h2>
+        <div class="control-group">
+            <label for="templateSelect">Wybierz szablon:</label>
+            <select id="templateSelect">
+                <option value="">-- Wybierz --</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label for="templateName">Nazwa nowego szablonu:</label>
+            <input type="text" id="templateName" placeholder="np. Turniej Główny">
+        </div>
+        
+        <button id="btn-save-template">Zapisz jako szablon</button>
+        <button id="btn-delete-template" class="danger-btn">Usuń wybrany</button>
+
+        <hr>
+
+        <div class="results-header">
+            <h2>Wyniki losowania</h2>
+            <label class="checkbox-label">
+                <input type="checkbox" id="cb-show-all"> Wyświetl wszystkie
+            </label>
+        </div>
+        
+        <div id="results-list">
+        </div>
+        
+        <button id="btn-copy-results" class="primary-btn" style="margin-top: 15px;">Kopiuj wyniki do schowka</button>
+    </div>
+
+    <script src="game.js"></script>
+    <script src="ui.js"></script>
+</body>
+</html>
