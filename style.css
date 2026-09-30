@@ -1,0 +1,184 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    overflow: hidden;
+    background-color: #0d131a;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e0e0e0;
+}
+
+#game-container {
+    flex-grow: 1;
+    height: 100%;
+    position: relative;
+}
+
+#names-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    pointer-events: none;
+    z-index: 10;
+    text-align: right;
+    font-size: 16px;
+}
+
+#ui-panel {
+    width: 350px;
+    min-width: 350px;
+    height: 100%;
+    background-color: #16202b;
+    border-left: 2px solid #3FC1C9;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+#ui-panel h2 {
+    font-size: 16px;
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #99FFFF;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background: #2a3b4c;
+    margin: 25px 0;
+    flex-shrink: 0;
+}
+
+.control-group {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    font-size: 13px;
+    margin-bottom: 5px;
+    color: #a0aab5;
+}
+
+input[type="number"], input[type="text"], select, textarea {
+    background-color: #0d131a;
+    border: 1px solid #3FC1C9;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+}
+
+textarea {
+    resize: vertical;
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: #99FFFF;
+}
+
+button {
+    background-color: #2a3b4c;
+    color: white;
+    border: 1px solid #3FC1C9;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 10px;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #3FC1C9;
+    color: #0d131a;
+}
+
+.primary-btn {
+    background-color: #3FC1C9;
+    color: #0d131a;
+    font-size: 16px;
+    padding: 12px;
+}
+
+.primary-btn:hover {
+    background-color: #99FFFF;
+}
+
+.danger-btn {
+    border-color: #ff4d4d;
+    background-color: transparent;
+    color: #ff4d4d;
+}
+
+.danger-btn:hover {
+    background-color: #ff4d4d;
+    color: white;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.checkbox-label {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    color: #a0aab5;
+    margin-bottom: 0;
+}
+
+#results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 20px;
+}
+
+.result-item {
+    background: #0d131a;
+    padding: 10px;
+    border-left: 4px solid #2a3b4c;
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    border-radius: 0 4px 4px 0;
+    transition: border-color 0.3s, background-color 0.3s;
+}
+
+.result-item.filled {
+    border-left-color: #99FFFF;
+    background: #111a24;
+}
+
+.hole-num {
+    color: #a0aab5;
+}
+
+.result-item.filled .hole-num {
+    color: #3FC1C9;
+}
+
+.ball-name {
+    font-weight: bold;
+    color: #99FFFF;
+}
