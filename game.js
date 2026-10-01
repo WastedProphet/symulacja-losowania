@@ -4,7 +4,7 @@ const BALL_RADIUS = 15;
 const BALL_DIAMETER = BALL_RADIUS * 2; 
 window.BALLS_PER_HOLE = 1;              
 window.BALL_NAMES = []; 
-window.highlightedBallName = null; 
+window.highlightedBallNames = []; // Zmienione na tablicę pod multi-select
 
 const HOLE_WIDTH = BALL_DIAMETER + 10;  
 const SEPARATOR_WIDTH = 4;             
@@ -113,9 +113,10 @@ function create() {
         if (pointer.button === 0 && gameObjects.length === 0) {
             if (window.closeZonePopover) window.closeZonePopover(); 
 
-            if (window.highlightedBallName !== null) {
-                window.highlightedBallName = null;
-                if (window.updateHighlightUI) window.updateHighlightUI(null);
+            // Kliknięcie w puste tło - odznaczenie wszystkiego
+            if (window.highlightedBallNames.length > 0) {
+                window.highlightedBallNames = [];
+                if (window.updateHighlightUI) window.updateHighlightUI(window.highlightedBallNames);
             }
         }
     });
@@ -445,18 +446,17 @@ function create() {
         ball.ballName = ballName; 
         ball.isReported = false; 
         
-        // NOWE: Inicjalizacja Prowadnic
         ball.isGuideVisible = window.ALL_GUIDES_ON || false;
         
         if (ballName !== '') {
             let neonRing = this.add.image(startX, startY, 'neonRing');
-            neonRing.setDepth(5); // Tuż nad kółkiem
+            neonRing.setDepth(5); 
             ball.neonRing = neonRing;
 
             ball.guideText = this.add.text(startX, startY - 55, ballName, {
                 fontSize: '14px', fill: '#0d131a', fontStyle: 'bold',
                 backgroundColor: '#99FFFF', padding: { x: 6, y: 4 }
-            }).setOrigin(0.5, 1); // 1 = zakotwiczone do dolnej krawędzi tekstu
+            }).setOrigin(0.5, 1); 
             
             ball.guideText.setDepth(101);
             ball.guideText.setVisible(ball.isGuideVisible);
@@ -507,17 +507,16 @@ function resetCameraView(scene) {
     scene.cameras.main.zoomTo(optimalZoom, 500, 'Sine.easeInOut');
 }
 
-// Funkcja zmieniająca tylko ZMIENNĄ. Alpha jest teraz wyliczana w 100% dynamicznie w update()
 window.toggleHighlight = function(name) {
-    if (window.highlightedBallName === name) {
-        window.highlightedBallName = null;
+    const index = window.highlightedBallNames.indexOf(name);
+    if (index > -1) {
+        window.highlightedBallNames.splice(index, 1);
     } else {
-        window.highlightedBallName = name;
+        window.highlightedBallNames.push(name);
     }
-    if (window.updateHighlightUI) window.updateHighlightUI(window.highlightedBallName);
+    if (window.updateHighlightUI) window.updateHighlightUI(window.highlightedBallNames);
 };
 
-// NOWE: Funkcje Globalne wywoływane przez menu boczne HTML z Oczkami
 window.toggleGuide = function(name, state) {
     balls.forEach(b => {
         if (b.ballName === name && b.guideText) {
@@ -540,17 +539,19 @@ window.toggleAllGuides = function(state) {
 
 function update(time, delta) {
     
+    // SPRZĘŻENIE GRAFIK DO WŁAŚCIWOŚCI PIŁKI I LOGIKA POKAZYWANIA PROWADNIC (Multi-select)
     let anyGuideVisible = balls.some(b => b.isGuideVisible);
+    let isAnyHighlighted = window.highlightedBallNames && window.highlightedBallNames.length > 0;
 
-    // --- KROK 1: Przezroczystość, obroty obręczy oraz podążanie tekstu za piłką ---
     balls.forEach(ball => {
         if (ball.neonRing) {
             ball.neonRing.setPosition(ball.x, ball.y);
             ball.neonRing.setRotation(ball.rotation);
         }
 
-        if (window.highlightedBallName !== null) {
-            let isHighlighted = ball.ballName === window.highlightedBallName;
+        let isHighlighted = isAnyHighlighted && window.highlightedBallNames.includes(ball.ballName);
+
+        if (isAnyHighlighted) {
             ball.setAlpha(isHighlighted ? 1 : 0.08);
             if(ball.neonRing) ball.neonRing.setAlpha(isHighlighted ? 1 : 0.08);
         } else {
@@ -562,40 +563,44 @@ function update(time, delta) {
             if(ball.neonRing) ball.neonRing.setAlpha(1);
         }
 
-        if (ball.ballName !== '' && ball.isGuideVisible) {
+        let shouldShowGuide = ball.ballName !== '' && ball.isGuideVisible;
+        if (isAnyHighlighted && !isHighlighted) {
+            shouldShowGuide = false;
+        }
+        
+        if (shouldShowGuide) {
+            ball.guideText.setVisible(true); 
+            ball.guideLine.setVisible(true);
+
             let targetX = ball.x;
             let targetY = ball.y - (55 / mainCamera.zoom); 
 
             ball.guideText.x += (targetX - ball.guideText.x) * 0.15;
             ball.guideText.y += (targetY - ball.guideText.y) * 0.15;
-            
             ball.guideText.setScale(1 / mainCamera.zoom);
+            
         } else if (ball.guideLine) {
             ball.guideLine.clear();
+            if (ball.guideText) ball.guideText.setVisible(false); 
         }
     });
 
-    // --- KROK 2: System "fizyki" rozpychającej nachodzące na siebie etykiety ---
-    let visibleBalls = balls.filter(b => b.ballName !== '' && b.isGuideVisible);
+    // ROZPYCHANIE PROWADNIC - AABB
+    let visibleBalls = balls.filter(b => b.ballName !== '' && b.isGuideVisible && b.guideText.visible);
     
-    // Robimy 3 szybkie pętle (iteracje relaksacji) by tekst zgrabnie się rozsunał, 
-    // nawet gdy bardzo wiele kulek wpadnie w jedno miejsce
     for(let iter = 0; iter < 3; iter++) {
         for (let i = 0; i < visibleBalls.length; i++) {
             for (let j = i + 1; j < visibleBalls.length; j++) {
                 let textA = visibleBalls[i].guideText;
                 let textB = visibleBalls[j].guideText;
 
-                let padding = 10 / mainCamera.zoom; // Odstęp 10px między ramkami (skalowany)
+                let padding = 10 / mainCamera.zoom; 
 
-                // Rzeczywista wielkość etykiet na płótnie
                 let wA = (textA.width * textA.scaleX) + padding;
                 let hA = (textA.height * textA.scaleY) + padding;
                 let wB = (textB.width * textB.scaleX) + padding;
                 let hB = (textB.height * textB.scaleY) + padding;
 
-                // Wyliczenie centralnego punktu ramki 
-                // (pamiętaj, że u Ciebie Origin Y tekstu wynosi 1 - czyli dół ramki)
                 let cxA = textA.x;
                 let cyA = textA.y - (hA / 2);
                 let cxB = textB.x;
@@ -609,12 +614,10 @@ function update(time, delta) {
                 let minDx = (wA / 2) + (wB / 2);
                 let minDy = (hA / 2) + (hB / 2);
 
-                // Sprawdzamy czy prostokąty na siebie nachodzą (Kolizja)
                 if (absDx < minDx && absDy < minDy) {
                     let overlapX = minDx - absDx;
                     let overlapY = minDy - absDy;
 
-                    // Rozsuwamy etykiety najkrótszą możliwą drogą uwolnienia
                     if (overlapX < overlapY) {
                         let sign = Math.sign(dx) || 1;
                         let push = (overlapX / 2) * sign;
@@ -631,7 +634,7 @@ function update(time, delta) {
         }
     }
 
-    // --- KROK 3: Rysowanie fizycznych linii do zaktualizowanych pozycji etykiet ---
+    // RYSOWANIE LINII DO ROZCHYLONYCH PROWADNIC
     visibleBalls.forEach(ball => {
         let angle = Phaser.Math.Angle.Between(ball.x, ball.y, ball.guideText.x, ball.guideText.y);
         let edgeX = ball.x + Math.cos(angle) * BALL_RADIUS;
@@ -884,7 +887,7 @@ window.restartSimulation = function() {
     separatorTips = [];
     centrifugeParts = [];
     balls = [];
-    window.highlightedBallName = null; 
+    window.highlightedBallNames = []; 
 
     game.scene.scenes[0].scene.restart();
 };
