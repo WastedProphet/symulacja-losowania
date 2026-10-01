@@ -251,7 +251,8 @@ function create() {
                 initialEnd = zone.end;
                 initialPointerX = pointer.worldX;
                 
-                rowSnapshot = JSON.parse(JSON.stringify(window.ZONES.filter(z => z.row === zone.row))));
+                // NAPRAWIONO: Błąd "SyntaxError: missing ) after argument list" - usunięto jeden nadmiarowy nawias
+                rowSnapshot = JSON.parse(JSON.stringify(window.ZONES.filter(z => z.row === zone.row)));
                 rowSnapshot.sort((a,b) => a.start - b.start);
                 targetZoneIdx = rowSnapshot.findIndex(z => z.id === zone.id);
             });
@@ -778,7 +779,7 @@ function update(time, delta) {
 
         const holeTotalWidth = HOLE_WIDTH + SEPARATOR_WIDTH;
         let timeElapsed = time - phaseTwoStartTime;
-        let currentActivationDist = 55 + (timeElapsed * 0.315); 
+        let currentActivationDist = 55 + (timeElapsed * 0.1); 
         
         let targetedCounts = {}; 
 
@@ -945,7 +946,7 @@ function update(time, delta) {
             let currentActivationDist = 55;
             
             if (!isPhaseOne && phaseTwoStartTime > 0) {
-                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.315);
+                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.1);
             }
 
             const maxNeededRadius = Math.sqrt(WORLD_WIDTH * WORLD_WIDTH + WORLD_HEIGHT * WORLD_HEIGHT);
