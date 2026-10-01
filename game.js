@@ -906,17 +906,18 @@ function update(time, delta) {
             }
         });
         
-        if (magnetGraphics) {
+            
+            if (magnetGraphics) {
             magnetGraphics.clear();
             
             if (window.SHOW_MAGNET_FIELDS && window.MAGNET_ENABLED) {
-                magnetGraphics.lineStyle(2, 0x8A2BE2, 0.8);
-                magnetGraphics.fillStyle(0x8A2BE2, 0.15); 
+                // Zmienione proporcje przezroczystości, by zapobiec tworzeniu jednolitej ściany 
+                // przy nałożeniu się na siebie 100 rosnących kół.
+                magnetGraphics.lineStyle(2, 0x8A2BE2, 0.3);
+                magnetGraphics.fillStyle(0x8A2BE2, 0.03); 
                 
                 for (let i = 0; i < window.HOLE_COUNT; i++) {
-                    let occ = occupiedHoles[i] || 0;
-                    let tgt = targetedCounts[i] || 0;
-                    if (occ + tgt >= window.BALLS_PER_HOLE) continue;
+                    // USUNIĘTO WARUNEK PRZERYWAJĄCY - pola rysują się zawsze niezależnie od zajętości dołka
 
                     let targetX = HOLES_OFFSET_X + (i * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
                     let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
@@ -924,10 +925,9 @@ function update(time, delta) {
                     let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].x : targetX;
                     let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].y : targetY;
 
-                    magnetGraphics.beginPath();
-                    magnetGraphics.arc(fieldX, fieldY, currentActivationDist, 0, Math.PI * 2);
-                    magnetGraphics.fillPath();
-                    magnetGraphics.strokePath();
+                    // Użycie natywnych, optymalniejszych instrukcji zamiast ścieżek
+                    magnetGraphics.fillCircle(fieldX, fieldY, currentActivationDist);
+                    magnetGraphics.strokeCircle(fieldX, fieldY, currentActivationDist);
                 }
             }
         }
