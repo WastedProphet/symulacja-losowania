@@ -778,7 +778,7 @@ function update(time, delta) {
 
         const holeTotalWidth = HOLE_WIDTH + SEPARATOR_WIDTH;
         let timeElapsed = time - phaseTwoStartTime;
-        let currentActivationDist = 55 + (timeElapsed * 0.1); 
+        let currentActivationDist = 55 + (timeElapsed * 0.315); 
         
         let targetedCounts = {}; 
 
@@ -947,7 +947,7 @@ function update(time, delta) {
             let currentActivationDist = 55;
             
             if (!isPhaseOne && phaseTwoStartTime > 0) {
-                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.1);
+                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.315);
             }
 
             const maxNeededRadius = Math.sqrt(WORLD_WIDTH * WORLD_WIDTH + WORLD_HEIGHT * WORLD_HEIGHT);
