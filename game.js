@@ -53,9 +53,10 @@ let phaseTwoStartTime = 0;
 let occupiedHoles = {}; 
 let separatorTips = []; 
 let isDraggingZone = false; 
+
 let holeFieldCenters = {}; 
-let magnetGraphics = null;
-let magnetTexts = [];
+let magnetGraphics = null; 
+let magnetTexts = []; 
 
 window.onresize = () => {
     if(game && game.scale) {
@@ -70,24 +71,6 @@ window.onresize = () => {
 
 function create() {
     mainCamera = this.cameras.main;
-    magnetGraphics.setDepth(1);
-    
-    let maskGraphics = this.make.graphics();
-    maskGraphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    let mask = new Phaser.Display.Masks.GeometryMask(this, maskGraphics);
-    
-    magnetGraphics.setMask(mask);
-
-    magnetTexts = [];
-    for (let i = 0; i < window.HOLE_COUNT; i++) {
-        let txt = this.add.text(0, 0, (i + 1).toString(), { 
-            fontSize: '26px', fill: '#8A2BE2', fontStyle: 'bold' 
-        }).setOrigin(0.5);
-        txt.setDepth(2);
-        txt.setVisible(false);
-        txt.setMask(mask);
-        magnetTexts.push(txt);
-    }
     
     if (this.textures.exists('ballBase')) this.textures.remove('ballBase');
     if (this.textures.exists('neonRing')) this.textures.remove('neonRing');
@@ -261,7 +244,7 @@ function create() {
                 initialEnd = zone.end;
                 initialPointerX = pointer.worldX;
                 
-                rowSnapshot = JSON.parse(JSON.stringify(window.ZONES.filter(z => z.row === zone.row)));
+                rowSnapshot = JSON.parse(JSON.stringify(window.ZONES.filter(z => z.row === zone.row))));
                 rowSnapshot.sort((a,b) => a.start - b.start);
                 targetZoneIdx = rowSnapshot.findIndex(z => z.id === zone.id);
             });
@@ -477,7 +460,7 @@ function create() {
             ball.guideText = this.add.text(startX, startY - 55, ballName, {
                 fontSize: '14px', fill: '#0d131a', fontStyle: 'bold',
                 backgroundColor: '#99FFFF', padding: { x: 6, y: 4 }
-            }).setOrigin(0.5, 1); 
+            }).setOrigin(0.5, 1);
             
             ball.guideText.setDepth(101);
             ball.guideText.setVisible(ball.isGuideVisible);
@@ -488,6 +471,27 @@ function create() {
         }
         
         balls.push(ball);
+    }
+
+    magnetGraphics = this.add.graphics();
+    magnetGraphics.setDepth(1);
+    
+    // --- Utworzenie maski (optymalizacja) i tekstów ---
+    let maskGraphics = this.make.graphics();
+    maskGraphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    let mask = new Phaser.Display.Masks.GeometryMask(this, maskGraphics);
+    
+    magnetGraphics.setMask(mask);
+
+    magnetTexts = [];
+    for (let i = 0; i < window.HOLE_COUNT; i++) {
+        let txt = this.add.text(0, 0, (i + 1).toString(), { 
+            fontSize: '26px', fill: '#8A2BE2', fontStyle: 'bold' 
+        }).setOrigin(0.5);
+        txt.setDepth(2);
+        txt.setVisible(false);
+        txt.setMask(mask);
+        magnetTexts.push(txt);
     }
 
     resetCameraView(this);
@@ -562,6 +566,7 @@ function update(time, delta) {
     let anyGuideVisible = balls.some(b => b.isGuideVisible);
     let isAnyHighlighted = window.highlightedBallNames && window.highlightedBallNames.length > 0;
 
+    // KROK 1: Przezroczystość, obroty obręczy oraz podążanie tekstu za piłką
     balls.forEach(ball => {
         if (ball.neonRing) {
             ball.neonRing.setPosition(ball.x, ball.y);
@@ -599,16 +604,12 @@ function update(time, delta) {
             ball.guideText.setScale(1 / mainCamera.zoom);
         } else if (ball.guideLine) {
             ball.guideLine.clear();
-            if (ball.guideText) ball.guideText.setVisible(false); 
+            if (ball.guideText) ball.guideText.setVisible(false);
         }
     });
 
-    let visibleBalls = balls.filter(b => {
-        let isHighlighted = isAnyHighlighted && window.highlightedBallNames.includes(b.ballName);
-        let shouldShowGuide = b.ballName !== '' && b.isGuideVisible;
-        if (isAnyHighlighted && !isHighlighted) shouldShowGuide = false;
-        return shouldShowGuide;
-    });
+    // KROK 2: System "fizyki" rozpychającej nachodzące na siebie etykiety
+    let visibleBalls = balls.filter(b => b.guideText && b.guideText.visible);
     
     for(let iter = 0; iter < 3; iter++) {
         for (let i = 0; i < visibleBalls.length; i++) {
@@ -655,6 +656,7 @@ function update(time, delta) {
         }
     }
 
+    // KROK 3: Rysowanie fizycznych linii do zaktualizowanych pozycji etykiet
     visibleBalls.forEach(ball => {
         let angle = Phaser.Math.Angle.Between(ball.x, ball.y, ball.guideText.x, ball.guideText.y);
         let edgeX = ball.x + Math.cos(angle) * BALL_RADIUS;
@@ -770,6 +772,7 @@ function update(time, delta) {
         
         let targetedCounts = {}; 
 
+        // PRZELOT 1: Wpadanie na dno i weryfikacja
         balls.forEach(ball => {
             if (ball.body.isLocked) {
                 if (ball.lockedTargetX !== undefined && ball.lockedTargetY !== undefined) {
@@ -847,6 +850,7 @@ function update(time, delta) {
             }
         });
 
+        // PRZELOT 2: Szukanie magnesów i przyciąganie
         balls.forEach(ball => {
             if (ball.body.isLocked) return;
             if (ball.y > WORLD_HEIGHT - SEPARATOR_HEIGHT) return; 
@@ -921,13 +925,12 @@ function update(time, delta) {
                 ball.claimedHole = null; 
             }
         });
-        
-            
-            if (magnetGraphics) {
+
+        // --- RYSOWANIE WIZUALIZACJI PÓL MAGNETYCZNYCH ---
+        if (magnetGraphics) {
             magnetGraphics.clear();
             
             if (window.SHOW_MAGNET_FIELDS && window.MAGNET_ENABLED) {
-                // Przezroczystość 90% (czyli widoczność/alpha = 0.1)
                 magnetGraphics.lineStyle(2, 0x8A2BE2, 0.15);
                 magnetGraphics.fillStyle(0x8A2BE2, 0.1); 
                 
@@ -938,20 +941,16 @@ function update(time, delta) {
                     let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].x : targetX;
                     let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].y : targetY;
 
-                    // Rysowanie zoptymalizowane maską
                     magnetGraphics.fillCircle(fieldX, fieldY, currentActivationDist);
                     magnetGraphics.strokeCircle(fieldX, fieldY, currentActivationDist);
 
-                    // Aktualizacja i pokazanie numeru w centrum pola
                     if (magnetTexts[i]) {
                         magnetTexts[i].setPosition(fieldX, fieldY);
                         magnetTexts[i].setVisible(true);
-                        // Stały rozmiar czcionki niezależnie od przybliżenia kamery
                         magnetTexts[i].setScale(1 / mainCamera.zoom);
                     }
                 }
             } else {
-                // Ukrycie wszystkich numerów, gdy wyłączono podgląd opcją z menu
                 for (let i = 0; i < magnetTexts.length; i++) {
                     if (magnetTexts[i]) magnetTexts[i].setVisible(false);
                 }
@@ -979,8 +978,8 @@ window.restartSimulation = function() {
     centrifugeParts = [];
     balls = [];
     window.highlightedBallNames = []; 
-    holeFieldCenters = {}; 
-    magnetTexts = [];
+    holeFieldCenters = {};
+    magnetTexts = []; 
 
     game.scene.scenes[0].scene.restart();
 };
