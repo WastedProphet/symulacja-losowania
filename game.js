@@ -54,7 +54,8 @@ let occupiedHoles = {};
 let separatorTips = []; 
 let isDraggingZone = false; 
 let holeFieldCenters = {}; 
-let magnetGraphics = null; 
+let magnetGraphics = null;
+let magnetTexts = [];
 
 window.onresize = () => {
     if(game && game.scale) {
@@ -69,9 +70,24 @@ window.onresize = () => {
 
 function create() {
     mainCamera = this.cameras.main;
-    
-    magnetGraphics = this.add.graphics();
     magnetGraphics.setDepth(1);
+    
+    let maskGraphics = this.make.graphics();
+    maskGraphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    let mask = new Phaser.Display.Masks.GeometryMask(this, maskGraphics);
+    
+    magnetGraphics.setMask(mask);
+
+    magnetTexts = [];
+    for (let i = 0; i < window.HOLE_COUNT; i++) {
+        let txt = this.add.text(0, 0, (i + 1).toString(), { 
+            fontSize: '26px', fill: '#8A2BE2', fontStyle: 'bold' 
+        }).setOrigin(0.5);
+        txt.setDepth(2);
+        txt.setVisible(false);
+        txt.setMask(mask);
+        magnetTexts.push(txt);
+    }
     
     if (this.textures.exists('ballBase')) this.textures.remove('ballBase');
     if (this.textures.exists('neonRing')) this.textures.remove('neonRing');
@@ -911,23 +927,33 @@ function update(time, delta) {
             magnetGraphics.clear();
             
             if (window.SHOW_MAGNET_FIELDS && window.MAGNET_ENABLED) {
-                // Zmienione proporcje przezroczystości, by zapobiec tworzeniu jednolitej ściany 
-                // przy nałożeniu się na siebie 100 rosnących kół.
-                magnetGraphics.lineStyle(2, 0x8A2BE2, 0.3);
-                magnetGraphics.fillStyle(0x8A2BE2, 0.03); 
+                // Przezroczystość 90% (czyli widoczność/alpha = 0.1)
+                magnetGraphics.lineStyle(2, 0x8A2BE2, 0.15);
+                magnetGraphics.fillStyle(0x8A2BE2, 0.1); 
                 
                 for (let i = 0; i < window.HOLE_COUNT; i++) {
-                    // USUNIĘTO WARUNEK PRZERYWAJĄCY - pola rysują się zawsze niezależnie od zajętości dołka
-
                     let targetX = HOLES_OFFSET_X + (i * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
                     let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
 
                     let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].x : targetX;
                     let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].y : targetY;
 
-                    // Użycie natywnych, optymalniejszych instrukcji zamiast ścieżek
+                    // Rysowanie zoptymalizowane maską
                     magnetGraphics.fillCircle(fieldX, fieldY, currentActivationDist);
                     magnetGraphics.strokeCircle(fieldX, fieldY, currentActivationDist);
+
+                    // Aktualizacja i pokazanie numeru w centrum pola
+                    if (magnetTexts[i]) {
+                        magnetTexts[i].setPosition(fieldX, fieldY);
+                        magnetTexts[i].setVisible(true);
+                        // Stały rozmiar czcionki niezależnie od przybliżenia kamery
+                        magnetTexts[i].setScale(1 / mainCamera.zoom);
+                    }
+                }
+            } else {
+                // Ukrycie wszystkich numerów, gdy wyłączono podgląd opcją z menu
+                for (let i = 0; i < magnetTexts.length; i++) {
+                    if (magnetTexts[i]) magnetTexts[i].setVisible(false);
                 }
             }
         }
@@ -954,6 +980,7 @@ window.restartSimulation = function() {
     balls = [];
     window.highlightedBallNames = []; 
     holeFieldCenters = {}; 
+    magnetTexts = [];
 
     game.scene.scenes[0].scene.restart();
 };
