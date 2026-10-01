@@ -34,7 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
         holeCount: 100,
         ballsPerHole: 1,
         ballNames: "",
-        zones: []
+        zones: [],
+        magnetEnabled: true,
+        superRandom: false
     };
 
     window.ZONES = [];
@@ -74,15 +76,19 @@ document.addEventListener('DOMContentLoaded', () => {
         inputBallsPerHole.value = data.ballsPerHole || 1;
         inputBallNames.value = data.ballNames || '';
         window.ZONES = data.zones ? JSON.parse(JSON.stringify(data.zones)) : [];
+        
+        cbMagnet.checked = data.magnetEnabled !== false;
+        cbSuperRandom.checked = data.superRandom === true;
     }
-
     function saveCurrentSession() {
         const currentData = {
             ballCount: parseInt(inputBallCount.value),
             holeCount: parseInt(inputHoleCount.value),
             ballsPerHole: parseInt(inputBallsPerHole.value),
             ballNames: inputBallNames.value,
-            zones: window.ZONES
+            zones: window.ZONES,
+            magnetEnabled: cbMagnet.checked,
+            superRandom: cbSuperRandom.checked
         };
         localStorage.setItem(SESSION_KEY, JSON.stringify(currentData));
     }
@@ -91,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const savedSession = localStorage.getItem(SESSION_KEY);
     if (savedSession) {
-        try { applySettings(JSON.parse(savedSession)); } catch (e) { applySettings(DEFAULT_SETTINGS); }
+        try { applySettings(JSON.parse(savedSession)); } catch (e) { applySettings(ULT_SETTINGS); }
     } else {
         applySettings(DEFAULT_SETTINGS);
     }
@@ -152,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cbShowAll.addEventListener('change', updateVisibility);
 
-    [inputBallCount, inputHoleCount, inputBallsPerHole, inputBallNames].forEach(el => {
+    [inputBallCount, inputHoleCount, inputBallsPerHole, inputBallNames, cbMagnet, cbSuperRandom].forEach(el => {
         el.addEventListener('change', saveCurrentSession);
     });
 
@@ -216,6 +222,9 @@ document.addEventListener('DOMContentLoaded', () => {
         window.HOLE_COUNT = parseInt(inputHoleCount.value);
         window.BALLS_PER_HOLE = parseInt(inputBallsPerHole.value);
         window.BALL_NAMES = inputBallNames.value.split('\n').map(n => n.trim()).filter(n => n);
+
+        window.MAGNET_ENABLED = cbMagnet.checked;
+        window.SUPER_RANDOM_ENABLED = cbSuperRandom.checked;
 
         resultsList.innerHTML = '';
         for(let i = 0; i < window.HOLE_COUNT; i++) {
