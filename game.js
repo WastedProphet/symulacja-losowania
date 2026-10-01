@@ -111,6 +111,9 @@ function create() {
     const arenaFrame = this.add.graphics();
     arenaFrame.lineStyle(4, 0x3FC1C9, 1);
     arenaFrame.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    
+    window.zoneGuideLine = this.add.graphics();
+    window.zoneGuideLine.setDepth(1000); 
 
     this.matter.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 50, true, true, true, true);
 
@@ -122,9 +125,7 @@ function create() {
     this.input.on('pointerdown', (pointer, gameObjects) => {
         if (pointer.button === 1) resetCameraView(this);
         
-        if (pointer.button === 0 && gameObjects.length === 0) {
-            if (window.closeZonePopover) window.closeZonePopover(); 
-
+        if ((pointer.button === 0 || pointer.button === 2) && gameObjects.length === 0) {
             if (window.highlightedBallNames.length > 0) {
                 window.highlightedBallNames = [];
                 if (window.updateHighlightUI) window.updateHighlightUI(window.highlightedBallNames);
@@ -175,6 +176,7 @@ function create() {
 
         window.ZONES.forEach((zone, index) => {
             if(!zone.id) zone.id = Date.now() + index;
+            if(!zone.allowedBalls) zone.allowedBalls = [];
 
             let startIdx = Math.max(0, zone.start - 1);
             let endIdx = Math.min(window.HOLE_COUNT - 1, zone.end - 1);
@@ -230,7 +232,6 @@ function create() {
             let initialPointerX = 0;
             let rowSnapshot = [];
             let targetZoneIdx = -1;
-            let downTime = 0;
 
             container.on('pointermove', (pointer, localX, localY) => {
                 if (localX > container.input.hitArea.width - 25) {
@@ -245,19 +246,20 @@ function create() {
             });
 
             container.on('pointerdown', (pointer, localX, localY) => {
-                downTime = Date.now(); 
+                if (pointer.button === 2) return; 
+                
                 dragMode = (localX > container.input.hitArea.width - 25) ? 'resize' : 'move';
                 initialStart = zone.start;
                 initialEnd = zone.end;
                 initialPointerX = pointer.worldX;
                 
-                // NAPRAWIONO: Błąd "SyntaxError: missing ) after argument list" - usunięto jeden nadmiarowy nawias
                 rowSnapshot = JSON.parse(JSON.stringify(window.ZONES.filter(z => z.row === zone.row)));
                 rowSnapshot.sort((a,b) => a.start - b.start);
                 targetZoneIdx = rowSnapshot.findIndex(z => z.id === zone.id);
             });
 
-            container.on('dragstart', () => {
+            container.on('dragstart', (pointer) => {
+                if (pointer && pointer.button === 2) return;
                 isDraggingZone = true;
                 this.game.canvas.style.cursor = dragMode === 'resize' ? 'ew-resize' : 'grabbing';
                 
@@ -267,6 +269,7 @@ function create() {
             });
 
             container.on('drag', (pointer) => {
+                if (pointer && pointer.button === 2) return;
                 let dx = pointer.worldX - initialPointerX;
                 let shiftHoles = Math.round(dx / holeTotalWidth);
 
@@ -327,6 +330,17 @@ function create() {
                                 c.input.hitArea.setTo(0, 0, newW, 40);
                                 if (c.updateVisuals) c.updateVisuals(newW);
                             }
+
+                            if (window.activeZonePopovers && window.activeZonePopovers[actualZone.id]) {
+                                let popover = window.activeZonePopovers[actualZone.id];
+                                let startInput = popover.querySelector('.ze-start');
+                                let endInput = popover.querySelector('.ze-end');
+                                let capacitySpan = popover.querySelector('.ze-capacity-number');
+
+                                if (startInput) startInput.value = actualZone.start;
+                                if (endInput) endInput.value = actualZone.end;
+                                if (capacitySpan) capacitySpan.textContent = Math.abs(actualZone.end - actualZone.start) + 1;
+                            }
                         }
                     });
                 }
@@ -340,8 +354,7 @@ function create() {
             });
 
             container.on('pointerup', (pointer) => {
-                let upTime = Date.now();
-                if (upTime - downTime < 350 && zone.start === initialStart && zone.end === initialEnd) {
+                if (pointer.button === 2) {
                     if (window.openZonePopover) window.openZonePopover(zone, pointer.event.clientX, pointer.event.clientY);
                 }
             });
@@ -391,7 +404,8 @@ function create() {
                     start: btn.start,
                     end: Math.min(btn.start + 2, maxEnd),
                     color: '#3FC1C9',
-                    name: 'Strefa'
+                    name: 'Strefa',
+                    allowedBalls: [] 
                 };
                 window.ZONES.push(newZone);
                 if (window.saveCurrentSession) window.saveCurrentSession();
@@ -404,7 +418,6 @@ function create() {
 
     window.drawPhaserZones();
 
-    // --- PRZYGOTOWANIE MASKI GRAFICZNEJ DO OPTYMALIZACJI TEKSTÓW ---
     magnetGraphics = this.add.graphics();
     magnetGraphics.setDepth(1);
     
@@ -415,11 +428,10 @@ function create() {
     let mask = new Phaser.Display.Masks.GeometryMask(this, maskGraphics);
     magnetGraphics.setMask(mask);
 
-    // Zmiana rozmiaru fontu numerów dołków z 26px na 16px
     magnetTexts = [];
     for (let i = 0; i < window.HOLE_COUNT; i++) {
         let txt = this.add.text(0, 0, (i + 1).toString(), { 
-            fontSize: '16px', fill: '#2a34fb', fontStyle: 'bold'  //kolor liczb
+            fontSize: '16px', fill: '#2D004D', fontStyle: 'bold' 
         }).setOrigin(0.5);
         txt.setDepth(10);
         txt.setVisible(false);
@@ -571,6 +583,45 @@ window.toggleAllGuides = function(state) {
         }
     });
 };
+
+function isBallAllowedInHole(ballName, holeIndex) {
+    let actualHoleNum = holeIndex + 1;
+
+    let isBallBoundGlobally = false;
+    if (ballName && ballName !== '') {
+        for (let z of window.ZONES) {
+            if (z.allowedBalls && z.allowedBalls.includes(ballName)) {
+                isBallBoundGlobally = true;
+                break;
+            }
+        }
+    }
+
+    let coveringZones = window.ZONES.filter(z => actualHoleNum >= z.start && actualHoleNum <= z.end);
+
+    if (isBallBoundGlobally) {
+        for (let z of coveringZones) {
+            if (z.allowedBalls && z.allowedBalls.includes(ballName)) {
+                return true; 
+            }
+        }
+        return false; 
+    } else {
+        let isHoleLocked = false;
+        for (let z of coveringZones) {
+            if (z.allowedBalls && z.allowedBalls.length > 0) {
+                isHoleLocked = true;
+                break;
+            }
+        }
+
+        if (isHoleLocked) {
+            return false; 
+        }
+
+        return true; 
+    }
+}
 
 function update(time, delta) {
     
@@ -799,10 +850,26 @@ function update(time, delta) {
             if (currentHoleIndex >= window.HOLE_COUNT) currentHoleIndex = window.HOLE_COUNT - 1;
 
             let currentOccupiedCount = occupiedHoles[currentHoleIndex] || 0;
+            let holeTop = WORLD_HEIGHT - SEPARATOR_HEIGHT;
 
-            if (ball.y > WORLD_HEIGHT - SEPARATOR_HEIGHT) {
-                if (currentOccupiedCount < window.BALLS_PER_HOLE) {
+            // --- NIEWIDZIALNA KLAPKA (TARCZA ODBIJAJĄCA NAD NIEUPRAWNIONYMI DOŁKAMI) ---
+            // Tarcza aktywuje się 35 pikseli nad krawędzią dołków
+            if (ball.y > holeTop - 35) {
+                let isAllowed = isBallAllowedInHole(ball.ballName, currentHoleIndex);
+                let isFull = currentOccupiedCount >= window.BALLS_PER_HOLE;
+
+                if (!isAllowed || isFull) {
+                    // Odrzucenie: Piłka nie ma wstępu do tego dołka LUB dołek jest pełny.
+                    // Odbijamy ją od "niewidzialnej klapki" na boki, ZANIM fizycznie zdoła zablokować się między ścianami
+                    let holeCenterX = HOLES_OFFSET_X + (currentHoleIndex * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
+                    let sidePush = (ball.x > holeCenterX) ? 1 : -1;
                     
+                    let kickForceX = sidePush * 0.015;
+                    let kickForceY = -0.04; 
+                    ball.applyForce({ x: kickForceX, y: kickForceY });
+                    ball.claimedHole = null; 
+                } else if (ball.y > holeTop) {
+                    // Wpadnięcie: Piłka jest uprawniona i środek wpadł poniżej górnej krawędzi - zasysamy i blokujemy!
                     occupiedHoles[currentHoleIndex] = currentOccupiedCount + 1;
                     ball.body.isLocked = true; 
                     ball.claimedHole = null; 
@@ -821,12 +888,6 @@ function update(time, delta) {
                         if (window.reportResult) window.reportResult(currentHoleIndex, ball.ballName);
                     }
                     return; 
-                } else {
-                    let kickForceX = Phaser.Math.Between(-3, 3) * 0.01;
-                    let kickForceY = -0.04; 
-                    ball.applyForce({ x: kickForceX, y: kickForceY });
-                    ball.claimedHole = null; 
-                    return; 
                 }
             }
 
@@ -836,8 +897,9 @@ function update(time, delta) {
                 } else {
                     let hIdx = ball.claimedHole;
                     let occ = occupiedHoles[hIdx] || 0;
+                    let isAllowed = isBallAllowedInHole(ball.ballName, hIdx);
                     
-                    if (occ >= window.BALLS_PER_HOLE) {
+                    if (occ >= window.BALLS_PER_HOLE || !isAllowed) {
                         ball.claimedHole = null; 
                     } else {
                         let targetX = HOLES_OFFSET_X + (hIdx * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
@@ -872,8 +934,9 @@ function update(time, delta) {
                     for (let i = 0; i < window.HOLE_COUNT; i++) {
                         let occ = occupiedHoles[i] || 0;
                         let tgt = targetedCounts[i] || 0;
+                        let isAllowed = isBallAllowedInHole(ball.ballName, i);
 
-                        if (occ + tgt < window.BALLS_PER_HOLE) {
+                        if (occ + tgt < window.BALLS_PER_HOLE && isAllowed) {
                             let targetX = HOLES_OFFSET_X + (i * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
                             let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
                             
@@ -937,7 +1000,6 @@ function update(time, delta) {
         });
     }
 
-    // --- NOWE: BEZPIECZNE WYŚWIETLANIE NUMERÓW (BEZ KÓŁ) ---
     if (magnetGraphics) {
         magnetGraphics.clear();
         
@@ -980,6 +1042,54 @@ function update(time, delta) {
         } else {
             for (let i = 0; i < magnetTexts.length; i++) {
                 if (magnetTexts[i]) magnetTexts[i].setVisible(false);
+            }
+        }
+    }
+
+    if (window.zoneGuideLine) {
+        window.zoneGuideLine.clear();
+        
+        if (window.activeZonePopovers && Object.keys(window.activeZonePopovers).length > 0) {
+            let cx = mainCamera.scrollX + mainCamera.width / 2;
+            let cy = mainCamera.scrollY + mainCamera.height / 2;
+
+            for (let zoneId in window.activeZonePopovers) {
+                let popover = window.activeZonePopovers[zoneId];
+                let zone = window.ZONES.find(z => z.id == zoneId);
+                
+                if (!zone || !zone.phaserContainer) continue;
+
+                let parsedColor = Phaser.Display.Color.HexStringToColor(zone.color).color;
+                window.zoneGuideLine.lineStyle(2 / mainCamera.zoom, parsedColor, 0.9);
+                window.zoneGuideLine.fillStyle(parsedColor, 1);
+
+                let zoneC = zone.phaserContainer;
+                let zWorldW = zoneC.input.hitArea.width;
+                let zWorldH = 40; 
+                
+                let popRect = popover.getBoundingClientRect();
+                
+                let popWorldLeft = (popRect.left - mainCamera.width / 2) / mainCamera.zoom + cx;
+                let popWorldRight = (popRect.right - mainCamera.width / 2) / mainCamera.zoom + cx;
+                let popWorldTop = (popRect.top - mainCamera.height / 2) / mainCamera.zoom + cy;
+                let popWorldBottom = (popRect.bottom - mainCamera.height / 2) / mainCamera.zoom + cy;
+                
+                let popWorldCenterX = (popWorldLeft + popWorldRight) / 2;
+                let popWorldCenterY = (popWorldTop + popWorldBottom) / 2;
+
+                let nearestZoneX = Phaser.Math.Clamp(popWorldCenterX, zoneC.x, zoneC.x + zWorldW);
+                let nearestZoneY = Phaser.Math.Clamp(popWorldCenterY, zoneC.y, zoneC.y + zWorldH);
+                
+                let nearestPopX = Phaser.Math.Clamp(nearestZoneX, popWorldLeft, popWorldRight);
+                let nearestPopY = Phaser.Math.Clamp(nearestZoneY, popWorldTop, popWorldBottom);
+                
+                window.zoneGuideLine.beginPath();
+                window.zoneGuideLine.moveTo(nearestPopX, nearestPopY);
+                window.zoneGuideLine.lineTo(nearestZoneX, nearestZoneY);
+                window.zoneGuideLine.strokePath();
+                
+                window.zoneGuideLine.fillCircle(nearestZoneX, nearestZoneY, 4 / mainCamera.zoom);
+                window.zoneGuideLine.fillCircle(nearestPopX, nearestPopY, 4 / mainCamera.zoom);
             }
         }
     }
