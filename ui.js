@@ -15,8 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsList = document.getElementById('results-list');
     const namesOverlay = document.getElementById('names-overlay');
     const cbShowAll = document.getElementById('cb-show-all');
+    
     const cbMagnet = document.getElementById('cb-magnet');
     const cbSuperRandom = document.getElementById('cb-super-random');
+    const cbShowFields = document.getElementById('cb-show-fields');
     
     const popover = document.getElementById('zone-editor-popover');
     const zeName = document.getElementById('ze-name');
@@ -36,7 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ballNames: "",
         zones: [],
         magnetEnabled: true,
-        superRandom: false
+        superRandom: false,
+        showFields: false
     };
 
     window.ZONES = [];
@@ -77,9 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
         inputBallNames.value = data.ballNames || '';
         window.ZONES = data.zones ? JSON.parse(JSON.stringify(data.zones)) : [];
         
-        cbMagnet.checked = data.magnetEnabled !== false;
+        cbMagnet.checked = data.magnetEnabled !== false; 
         cbSuperRandom.checked = data.superRandom === true;
+        cbShowFields.checked = data.showFields === true;
     }
+
     function saveCurrentSession() {
         const currentData = {
             ballCount: parseInt(inputBallCount.value),
@@ -88,7 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ballNames: inputBallNames.value,
             zones: window.ZONES,
             magnetEnabled: cbMagnet.checked,
-            superRandom: cbSuperRandom.checked
+            superRandom: cbSuperRandom.checked,
+            showFields: cbShowFields.checked
         };
         localStorage.setItem(SESSION_KEY, JSON.stringify(currentData));
     }
@@ -97,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const savedSession = localStorage.getItem(SESSION_KEY);
     if (savedSession) {
-        try { applySettings(JSON.parse(savedSession)); } catch (e) { applySettings(ULT_SETTINGS); }
+        try { applySettings(JSON.parse(savedSession)); } catch (e) { applySettings(DEFAULT_SETTINGS); }
     } else {
         applySettings(DEFAULT_SETTINGS);
     }
@@ -112,7 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
             holeCount: parseInt(inputHoleCount.value),
             ballsPerHole: parseInt(inputBallsPerHole.value),
             ballNames: inputBallNames.value,
-            zones: window.ZONES
+            zones: window.ZONES,
+            magnetEnabled: cbMagnet.checked,
+            superRandom: cbSuperRandom.checked,
+            showFields: cbShowFields.checked
         };
         saveTemplatesToStorage(templates);
         updateTemplateDropdown();
@@ -158,8 +167,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cbShowAll.addEventListener('change', updateVisibility);
 
-    [inputBallCount, inputHoleCount, inputBallsPerHole, inputBallNames, cbMagnet, cbSuperRandom].forEach(el => {
+    [inputBallCount, inputHoleCount, inputBallsPerHole, inputBallNames, cbMagnet, cbSuperRandom, cbShowFields].forEach(el => {
         el.addEventListener('change', saveCurrentSession);
+    });
+
+    [cbMagnet, cbSuperRandom, cbShowFields].forEach(el => {
+        el.addEventListener('change', () => {
+            window.MAGNET_ENABLED = cbMagnet.checked;
+            window.SUPER_RANDOM_ENABLED = cbSuperRandom.checked;
+            window.SHOW_MAGNET_FIELDS = cbShowFields.checked;
+        });
     });
 
     window.openZonePopover = function(zone, screenX, screenY) {
@@ -222,9 +239,10 @@ document.addEventListener('DOMContentLoaded', () => {
         window.HOLE_COUNT = parseInt(inputHoleCount.value);
         window.BALLS_PER_HOLE = parseInt(inputBallsPerHole.value);
         window.BALL_NAMES = inputBallNames.value.split('\n').map(n => n.trim()).filter(n => n);
-
+        
         window.MAGNET_ENABLED = cbMagnet.checked;
         window.SUPER_RANDOM_ENABLED = cbSuperRandom.checked;
+        window.SHOW_MAGNET_FIELDS = cbShowFields.checked;
 
         resultsList.innerHTML = '';
         for(let i = 0; i < window.HOLE_COUNT; i++) {
@@ -338,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.overlay-name').forEach(el => {
             if (el.classList.contains('global-eye')) return; 
 
-            if (!activeNamesArray || activeNamesArray.length === 0) {
+            if (activeNamesArray.length === 0) {
                 el.style.opacity = '1';
                 el.style.color = '#ffffff';
             } else if (activeNamesArray.includes(el.dataset.originalName)) {
