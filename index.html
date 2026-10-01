@@ -9,22 +9,6 @@
 <body>
     <div id="game-container">
         <div id="names-overlay"></div>
-        
-        <div id="zone-editor-popover" class="hidden">
-            <div class="popover-arrow"></div>
-            <div class="popover-header">Edytuj strefę</div>
-            <input type="text" id="ze-name" placeholder="Nazwa strefy">
-            <div class="ze-row">
-                <input type="color" id="ze-color" title="Kolor strefy">
-                <input type="number" id="ze-start" min="1" max="1000" title="Dołek początkowy">
-                <span> - </span>
-                <input type="number" id="ze-end" min="1" max="1000" title="Dołek końcowy">
-            </div>
-            <div class="ze-actions">
-                <button id="ze-save" class="primary-btn">Zapisz / Zamknij</button>
-                <button id="ze-delete" class="danger-btn">Usuń</button>
-            </div>
-        </div>
     </div>
     
     <div id="ui-panel">
@@ -56,17 +40,17 @@
 
         <h2>Ustawienia Magicznych Dołków</h2>
         <div class="control-group">
-            <label class="checkbox-label" title="Włącz lub wyłącz domyślną mechanikę przyciągania dołków (Pozostanie sama fizyka odbijania i grawitacja - to sprawi, że czas symulacji znacznie się wydłuży, ponieważ szansa na wpadnięcie piłki do dołka maleje proporcjonalnie do ilości zajętych dołków)">
+            <label class="checkbox-label" title="Przełączyć możesz również podczas trwającej jeszcze symulacji">
                 <input type="checkbox" id="cb-magnet" checked> Włącz przyciąganie dołków
             </label>
         </div>
         <div class="control-group">
-            <label class="checkbox-label" title="Ustala losowe pozycje dla pól przyciągania dołków (gdy piłka znajduje się w obszarze pola, jest przyciągana do danego dołka o ile nie wypadnie z obszaru)">
+            <label class="checkbox-label" title="Przełączyć możesz również podczas trwającej jeszcze symulacji">
                 <input type="checkbox" id="cb-super-random"> Super losowość (losowe pola)
             </label>
         </div>
         <div class="control-group">
-            <label class="checkbox-label" title="Wyświetla pozycję startu rozrastającego się obszaru dla konkretnego dołka">
+            <label class="checkbox-label" title="Przełączyć możesz również podczas trwającej jeszcze symulacji">
                 <input type="checkbox" id="cb-show-fields"> Wyświetl położenie obszarów kierujących do dołka
             </label>
         </div>
@@ -88,6 +72,22 @@
         
         <button id="btn-save-template">Zapisz jako szablon</button>
         <button id="btn-delete-template" class="danger-btn">Usuń wybrany</button>
+
+        <!-- NOWA SEKCJA: Import / Eksport kodu szablonu -->
+        <div style="margin-top: 20px; background: rgba(13, 19, 26, 0.6); padding: 12px; border-radius: 6px; border: 1px dashed rgba(63, 193, 201, 0.5);">
+            <button id="btn-generate-code" style="width: 100%; margin-top: 0;">Wygeneruj kod tego szablonu</button>
+            <div class="control-group" style="margin-top: 10px; margin-bottom: 0;">
+                <textarea id="templateCodeOutput" rows="2" placeholder="Tu pojawi się kod do skopiowania..." readonly style="background-color: #111a24; color: #99FFFF; word-break: break-all; resize: none; outline: none;"></textarea>
+            </div>
+            
+            <hr style="margin: 15px 0; border-color: rgba(63, 193, 201, 0.2);">
+            
+            <div class="control-group" style="margin-bottom: 10px;">
+                <label for="templateCodeInput" style="color: #99FFFF; font-weight: bold;">Wgraj szablon z kodu:</label>
+                <textarea id="templateCodeInput" rows="2" placeholder="Wklej kod od innego gracza..." style="word-break: break-all; resize: none;"></textarea>
+            </div>
+            <button id="btn-load-code" class="primary-btn" style="width: 100%; margin-top: 0; padding: 8px;">Wczytaj z kodu</button>
+        </div>
 
         <hr>
 
