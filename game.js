@@ -4,7 +4,7 @@ const BALL_RADIUS = 15;
 const BALL_DIAMETER = BALL_RADIUS * 2; 
 window.BALLS_PER_HOLE = 1;              
 window.BALL_NAMES = []; 
-window.highlightedBallNames = []; // Zmienione na tablicę pod multi-select
+window.highlightedBallNames = []; 
 
 const HOLE_WIDTH = BALL_DIAMETER + 10;  
 const SEPARATOR_WIDTH = 4;             
@@ -23,7 +23,7 @@ const WORLD_HEIGHT = 2000;
 const config = {
     type: Phaser.WEBGL,
     parent: 'game-container',
-    disableContextMenu: true,
+    disableContextMenu: true, 
     width: window.innerWidth - 350,
     height: window.innerHeight,
     transparent: true,
@@ -53,6 +53,7 @@ let phaseTwoStartTime = 0;
 let occupiedHoles = {}; 
 let separatorTips = []; 
 let isDraggingZone = false; 
+let holeFieldCenters = {}; 
 
 window.onresize = () => {
     if(game && game.scale) {
@@ -114,7 +115,6 @@ function create() {
         if (pointer.button === 0 && gameObjects.length === 0) {
             if (window.closeZonePopover) window.closeZonePopover(); 
 
-            // Kliknięcie w puste tło - odznaczenie wszystkiego
             if (window.highlightedBallNames.length > 0) {
                 window.highlightedBallNames = [];
                 if (window.updateHighlightUI) window.updateHighlightUI(window.highlightedBallNames);
@@ -540,10 +540,10 @@ window.toggleAllGuides = function(state) {
 
 function update(time, delta) {
     
-    // SPRZĘŻENIE GRAFIK DO WŁAŚCIWOŚCI PIŁKI I LOGIKA POKAZYWANIA PROWADNIC (Multi-select)
     let anyGuideVisible = balls.some(b => b.isGuideVisible);
     let isAnyHighlighted = window.highlightedBallNames && window.highlightedBallNames.length > 0;
 
+    // --- KROK 1: Przezroczystość, obroty obręczy oraz podążanie tekstu za piłką ---
     balls.forEach(ball => {
         if (ball.neonRing) {
             ball.neonRing.setPosition(ball.x, ball.y);
@@ -570,7 +570,7 @@ function update(time, delta) {
         }
         
         if (shouldShowGuide) {
-            ball.guideText.setVisible(true); 
+            ball.guideText.setVisible(true);
             ball.guideLine.setVisible(true);
 
             let targetX = ball.x;
@@ -578,16 +578,16 @@ function update(time, delta) {
 
             ball.guideText.x += (targetX - ball.guideText.x) * 0.15;
             ball.guideText.y += (targetY - ball.guideText.y) * 0.15;
-            ball.guideText.setScale(1 / mainCamera.zoom);
             
+            ball.guideText.setScale(1 / mainCamera.zoom);
         } else if (ball.guideLine) {
             ball.guideLine.clear();
-            if (ball.guideText) ball.guideText.setVisible(false); 
+            if (ball.guideText) ball.guideText.setVisible(false);
         }
     });
 
-    // ROZPYCHANIE PROWADNIC - AABB
-    let visibleBalls = balls.filter(b => b.ballName !== '' && b.isGuideVisible && b.guideText.visible);
+    // --- KROK 2: System "fizyki" rozpychającej nachodzące na siebie etykiety ---
+    let visibleBalls = balls.filter(b => b.guideText && b.guideText.visible);
     
     for(let iter = 0; iter < 3; iter++) {
         for (let i = 0; i < visibleBalls.length; i++) {
@@ -595,7 +595,7 @@ function update(time, delta) {
                 let textA = visibleBalls[i].guideText;
                 let textB = visibleBalls[j].guideText;
 
-                let padding = 10 / mainCamera.zoom; 
+                let padding = 10 / mainCamera.zoom;
 
                 let wA = (textA.width * textA.scaleX) + padding;
                 let hA = (textA.height * textA.scaleY) + padding;
@@ -635,7 +635,7 @@ function update(time, delta) {
         }
     }
 
-    // RYSOWANIE LINII DO ROZCHYLONYCH PROWADNIC
+    // --- KROK 3: Rysowanie fizycznych linii do zaktualizowanych pozycji etykiet ---
     visibleBalls.forEach(ball => {
         let angle = Phaser.Math.Angle.Between(ball.x, ball.y, ball.guideText.x, ball.guideText.y);
         let edgeX = ball.x + Math.cos(angle) * BALL_RADIUS;
@@ -689,7 +689,19 @@ function update(time, delta) {
             }
         });
     } else {
-        if (phaseTwoStartTime === 0) phaseTwoStartTime = time;
+        if (phaseTwoStartTime === 0) {
+            phaseTwoStartTime = time;
+            
+            // SUPER LOSOWOŚĆ - Inicjalizacja pół magnesów
+            if (window.SUPER_RANDOM_ENABLED) {
+                for (let i = 0; i < window.HOLE_COUNT; i++) {
+                    holeFieldCenters[i] = {
+                        x: Phaser.Math.Between(0, WORLD_WIDTH),
+                        y: Phaser.Math.Between(0, WORLD_HEIGHT - 300)
+                    };
+                }
+            }
+        }
 
         for (let i = 0; i < balls.length; i++) {
             for (let j = i + 1; j < balls.length; j++) {
@@ -743,6 +755,7 @@ function update(time, delta) {
         
         let targetedCounts = {}; 
 
+        // PRZELOT 1: Rozpatrywanie kolizji na dnie i blokowanie zajętych dołków
         balls.forEach(ball => {
             if (ball.body.isLocked) {
                 if (ball.lockedTargetX !== undefined && ball.lockedTargetY !== undefined) {
@@ -791,80 +804,109 @@ function update(time, delta) {
             }
 
             if (ball.claimedHole !== null) {
-                let hIdx = ball.claimedHole;
-                let occ = occupiedHoles[hIdx] || 0;
-                
-                if (occ >= window.BALLS_PER_HOLE) {
-                    ball.claimedHole = null; 
+                if (window.MAGNET_ENABLED === false) {
+                    ball.claimedHole = null;
                 } else {
-                    let targetX = HOLES_OFFSET_X + (hIdx * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
-                    let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
-                    let dx = targetX - ball.x;
-                    let dy = targetY - ball.y;
-                    let dist = Math.sqrt(dx * dx + dy * dy);
-
-                    if (dist > currentActivationDist) {
+                    let hIdx = ball.claimedHole;
+                    let occ = occupiedHoles[hIdx] || 0;
+                    
+                    if (occ >= window.BALLS_PER_HOLE) {
                         ball.claimedHole = null; 
                     } else {
-                        targetedCounts[hIdx] = (targetedCounts[hIdx] || 0) + 1; 
+                        let targetX = HOLES_OFFSET_X + (hIdx * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
+                        let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
+                        
+                        let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[hIdx] ? holeFieldCenters[hIdx].x : targetX;
+                        let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[hIdx] ? holeFieldCenters[hIdx].y : targetY;
+
+                        let dx = fieldX - ball.x;
+                        let dy = fieldY - ball.y;
+                        let dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist > currentActivationDist) {
+                            ball.claimedHole = null; 
+                        } else {
+                            targetedCounts[hIdx] = (targetedCounts[hIdx] || 0) + 1; 
+                        }
                     }
                 }
             }
         });
 
+        // PRZELOT 2: Fizyka szukania nowych magnesów i przyciąganie (Tylko jeśli MAGNET_ENABLED = true)
         balls.forEach(ball => {
             if (ball.body.isLocked) return;
             if (ball.y > WORLD_HEIGHT - SEPARATOR_HEIGHT) return; 
 
-            if (ball.claimedHole === null) {
-                let closestHole = null;
-                let minDistance = currentActivationDist;
+            if (window.MAGNET_ENABLED !== false) {
+                if (ball.claimedHole === null) {
+                    let closestHole = null;
+                    let minDistance = currentActivationDist;
 
-                for (let i = 0; i < window.HOLE_COUNT; i++) {
-                    let occ = occupiedHoles[i] || 0;
-                    let tgt = targetedCounts[i] || 0;
+                    for (let i = 0; i < window.HOLE_COUNT; i++) {
+                        let occ = occupiedHoles[i] || 0;
+                        let tgt = targetedCounts[i] || 0;
 
-                    if (occ + tgt < window.BALLS_PER_HOLE) {
-                        let targetX = HOLES_OFFSET_X + (i * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
-                        let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
-                        let dx = targetX - ball.x;
-                        let dy = targetY - ball.y;
-                        let dist = Math.sqrt(dx * dx + dy * dy);
+                        if (occ + tgt < window.BALLS_PER_HOLE) {
+                            let targetX = HOLES_OFFSET_X + (i * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
+                            let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
+                            
+                            let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].x : targetX;
+                            let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].y : targetY;
+                            
+                            let dx = fieldX - ball.x;
+                            let dy = fieldY - ball.y;
+                            let dist = Math.sqrt(dx * dx + dy * dy);
 
-                        if (dist < minDistance && ball.y < WORLD_HEIGHT) {
-                            minDistance = dist;
-                            closestHole = i;
+                            if (dist < minDistance && ball.y < WORLD_HEIGHT) {
+                                minDistance = dist;
+                                closestHole = i;
+                            }
                         }
+                    }
+
+                    if (closestHole !== null) {
+                        ball.claimedHole = closestHole;
+                        targetedCounts[closestHole] = (targetedCounts[closestHole] || 0) + 1; 
                     }
                 }
 
-                if (closestHole !== null) {
-                    ball.claimedHole = closestHole;
-                    targetedCounts[closestHole] = (targetedCounts[closestHole] || 0) + 1; 
+                if (ball.claimedHole !== null) {
+                    let hIdx = ball.claimedHole;
+                    let targetX = HOLES_OFFSET_X + (hIdx * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
+                    let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
+                    
+                    let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[hIdx] ? holeFieldCenters[hIdx].x : targetX;
+                    let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[hIdx] ? holeFieldCenters[hIdx].y : targetY;
+                    let fieldDx = fieldX - ball.x;
+                    let fieldDy = fieldY - ball.y;
+                    let distToField = Math.sqrt(fieldDx * fieldDx + fieldDy * fieldDy);
+                    
+                    let intensity = 1 - (distToField / currentActivationDist);
+                    if (intensity < 0) intensity = 0; 
+                    
+                    if (distToField <= currentActivationDist * 0.25) {
+                        ball.setBounce(0);
+                    } else {
+                        ball.setBounce(0.5 * (1 - intensity));
+                    }
+
+                    ball.setIgnoreGravity(true);
+                    
+                    // ZAWSZE ciągnie do dziury, nieważne skąd brał siłę intensity (Super Losowość)
+                    let actualDx = targetX - ball.x;
+                    let actualDy = targetY - ball.y;
+                    let actualDist = Math.sqrt(actualDx * actualDx + actualDy * actualDy);
+                    
+                    if (actualDist > 0) {
+                        let pullForce = 0.002 * intensity; 
+                        ball.applyForce({ x: (actualDx / actualDist) * pullForce, y: (actualDy / actualDist) * pullForce });
+                    }
+                    
+                    ball.setVelocityX(ball.body.velocity.x * (1 - (0.15 * intensity)));
                 }
-            }
-
-            if (ball.claimedHole !== null) {
-                let hIdx = ball.claimedHole;
-                let targetX = HOLES_OFFSET_X + (hIdx * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
-                let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
-                let dx = targetX - ball.x;
-                let dy = targetY - ball.y;
-                let dist = Math.sqrt(dx * dx + dy * dy);
-
-                let intensity = 1 - (dist / currentActivationDist);
-                
-                if (dist <= currentActivationDist * 0.25) {
-                    ball.setBounce(0);
-                } else {
-                    ball.setBounce(0.5 * (1 - intensity));
-                }
-
-                ball.setIgnoreGravity(true);
-                
-                let pullForce = 0.002 * intensity; 
-                ball.applyForce({ x: (dx / dist) * pullForce, y: (dy / dist) * pullForce });
-                ball.setVelocityX(ball.body.velocity.x * (1 - (0.15 * intensity)));
+            } else {
+                ball.claimedHole = null; 
             }
         });
     }
@@ -888,7 +930,9 @@ window.restartSimulation = function() {
     separatorTips = [];
     centrifugeParts = [];
     balls = [];
+    
     window.highlightedBallNames = []; 
+    holeFieldCenters = {};
 
     game.scene.scenes[0].scene.restart();
 };
