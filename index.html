@@ -11,7 +11,7 @@
         <!-- Niezależna nakładka HTML na nazwy piłeczek w prawym górnym rogu -->
         <div id="names-overlay"></div>
         
-        <!-- NOWE: Elegancka prowadnica (popover) do edycji klikniętej strefy -->
+        <!-- Elegancka prowadnica (popover) do edycji klikniętej strefy -->
         <div id="zone-editor-popover" class="hidden">
             <div class="popover-arrow"></div>
             <div class="popover-header">Edytuj strefę</div>
@@ -58,13 +58,18 @@
 
         <h2>Ustawienia Magicznych Dołków</h2>
         <div class="control-group">
-            <label class="checkbox-label">
+            <label class="checkbox-label" title="Przełączyć możesz również podczas trwającej jeszcze symulacji">
                 <input type="checkbox" id="cb-magnet" checked> Włącz przyciąganie dołków
             </label>
         </div>
         <div class="control-group">
-            <label class="checkbox-label">
-                <input type="checkbox" id="cb-super-random"> Super losowość (losowe pola przyciągania)
+            <label class="checkbox-label" title="Przełączyć możesz również podczas trwającej jeszcze symulacji">
+                <input type="checkbox" id="cb-super-random"> Super losowość (losowe pola)
+            </label>
+        </div>
+        <div class="control-group">
+            <label class="checkbox-label" title="Przełączyć możesz również podczas trwającej jeszcze symulacji">
+                <input type="checkbox" id="cb-show-fields"> Wizualizacja pól przyciągania
             </label>
         </div>
 
