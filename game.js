@@ -251,7 +251,7 @@ function create() {
                 initialEnd = zone.end;
                 initialPointerX = pointer.worldX;
                 
-                rowSnapshot = JSON.parse(JSON.stringify(window.ZONES.filter(z => z.row === zone.row)));
+                rowSnapshot = JSON.parse(JSON.stringify(window.ZONES.filter(z => z.row === zone.row))));
                 rowSnapshot.sort((a,b) => a.start - b.start);
                 targetZoneIdx = rowSnapshot.findIndex(z => z.id === zone.id);
             });
@@ -403,11 +403,10 @@ function create() {
 
     window.drawPhaserZones();
 
-    // --- PRZYGOTOWANIE MASKI GRAFICZNEJ DO OPTYMALIZACJI PÓL MAGNETYCZNYCH ---
+    // --- PRZYGOTOWANIE MASKI GRAFICZNEJ DO OPTYMALIZACJI TEKSTÓW ---
     magnetGraphics = this.add.graphics();
     magnetGraphics.setDepth(1);
     
-    // Tworzymy Graphics do maski (dodane bezpośrednio, by zapobiec błędom WebGL)
     let maskGraphics = this.add.graphics();
     maskGraphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     maskGraphics.setVisible(false); 
@@ -415,10 +414,11 @@ function create() {
     let mask = new Phaser.Display.Masks.GeometryMask(this, maskGraphics);
     magnetGraphics.setMask(mask);
 
+    // Zmiana rozmiaru fontu numerów dołków z 26px na 16px
     magnetTexts = [];
     for (let i = 0; i < window.HOLE_COUNT; i++) {
         let txt = this.add.text(0, 0, (i + 1).toString(), { 
-            fontSize: '26px', fill: '#2D004D', fontStyle: 'bold' 
+            fontSize: '16px', fill: '#2D004D', fontStyle: 'bold' 
         }).setOrigin(0.5);
         txt.setDepth(10);
         txt.setVisible(false);
@@ -778,7 +778,7 @@ function update(time, delta) {
 
         const holeTotalWidth = HOLE_WIDTH + SEPARATOR_WIDTH;
         let timeElapsed = time - phaseTwoStartTime;
-        let currentActivationDist = 55 + (timeElapsed * 0.315); 
+        let currentActivationDist = 55 + (timeElapsed * 0.1); 
         
         let targetedCounts = {}; 
 
@@ -936,18 +936,16 @@ function update(time, delta) {
         });
     }
 
+    // --- NOWE: BEZPIECZNE WYŚWIETLANIE NUMERÓW (BEZ KÓŁ) ---
     if (magnetGraphics) {
         magnetGraphics.clear();
         
         if (window.SHOW_MAGNET_FIELDS && window.MAGNET_ENABLED) {
-            magnetGraphics.lineStyle(2, 0x8A2BE2, 0.15);
-            magnetGraphics.fillStyle(0x8A2BE2, 0.1); 
-            
             const holeTotalWidth = HOLE_WIDTH + SEPARATOR_WIDTH;
             let currentActivationDist = 55;
             
             if (!isPhaseOne && phaseTwoStartTime > 0) {
-                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.315);
+                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.1);
             }
 
             const maxNeededRadius = Math.sqrt(WORLD_WIDTH * WORLD_WIDTH + WORLD_HEIGHT * WORLD_HEIGHT);
@@ -968,15 +966,14 @@ function update(time, delta) {
                 let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].x : targetX;
                 let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].y : targetY;
 
-                if (currentActivationDist < maxNeededRadius) {
-                    magnetGraphics.fillCircle(fieldX, fieldY, currentActivationDist);
-                    magnetGraphics.strokeCircle(fieldX, fieldY, currentActivationDist);
-                }
-
                 if (magnetTexts[i]) {
-                    magnetTexts[i].setPosition(fieldX, fieldY);
-                    magnetTexts[i].setVisible(true);
-                    magnetTexts[i].setScale(1 / mainCamera.zoom);
+                    if (currentActivationDist < maxNeededRadius) {
+                        magnetTexts[i].setPosition(fieldX, fieldY);
+                        magnetTexts[i].setVisible(true);
+                        magnetTexts[i].setScale(1 / mainCamera.zoom);
+                    } else {
+                        magnetTexts[i].setVisible(false);
+                    }
                 }
             }
         } else {
