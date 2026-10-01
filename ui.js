@@ -19,14 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const cbMagnet = document.getElementById('cb-magnet');
     const cbSuperRandom = document.getElementById('cb-super-random');
     const cbShowFields = document.getElementById('cb-show-fields');
-    
-    const popover = document.getElementById('zone-editor-popover');
-    const zeName = document.getElementById('ze-name');
-    const zeColor = document.getElementById('ze-color');
-    const zeStart = document.getElementById('ze-start');
-    const zeEnd = document.getElementById('ze-end');
-    const btnZeSave = document.getElementById('ze-save');
-    const btnZeDelete = document.getElementById('ze-delete');
 
     const STORAGE_KEY = 'lottery_templates';
     const SESSION_KEY = 'lottery_last_session';
@@ -44,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.ZONES = [];
     window.ALL_GUIDES_ON = false; 
-    let currentEditingZone = null;
+    window.activeZonePopovers = {};
 
     function loadTemplates() {
         const templatesRaw = localStorage.getItem(STORAGE_KEY);
@@ -146,6 +138,68 @@ document.addEventListener('DOMContentLoaded', () => {
         saveTemplatesToStorage(templates);
         updateTemplateDropdown();
     });
+	
+	// --- IMPORT / EKSPORT KODÓW SZABLONÓW ---
+    const btnGenerateCode = document.getElementById('btn-generate-code');
+    const templateCodeOutput = document.getElementById('templateCodeOutput');
+    const btnLoadCode = document.getElementById('btn-load-code');
+    const templateCodeInput = document.getElementById('templateCodeInput');
+
+    // Generowanie kodu dla obecnych ustawień
+    btnGenerateCode.addEventListener('click', () => {
+        const currentData = {
+            ballCount: parseInt(inputBallCount.value),
+            holeCount: parseInt(inputHoleCount.value),
+            ballsPerHole: parseInt(inputBallsPerHole.value),
+            ballNames: inputBallNames.value,
+            zones: window.ZONES,
+            magnetEnabled: cbMagnet.checked,
+            superRandom: cbSuperRandom.checked,
+            showFields: cbShowFields.checked
+        };
+        
+        try {
+            // Zamiana obiektu JSON na string, zabezpieczenie znaków specjalnych i kodowanie Base64
+            const codeString = btoa(encodeURIComponent(JSON.stringify(currentData)));
+            templateCodeOutput.value = codeString;
+            
+            // Opcjonalne automatyczne skopiowanie do schowka
+            navigator.clipboard.writeText(codeString).then(() => {
+                const originalText = btnGenerateCode.textContent;
+                btnGenerateCode.textContent = 'Skopiowano kod do schowka!';
+                setTimeout(() => { btnGenerateCode.textContent = originalText; }, 2000);
+            });
+        } catch(e) {
+            alert('Wystąpił błąd podczas generowania kodu.');
+        }
+    });
+
+    // Wczytywanie ustawień z kodu użytkownika
+    btnLoadCode.addEventListener('click', () => {
+        const codeString = templateCodeInput.value.trim();
+        if (!codeString) {
+            alert('Najpierw wklej kod szablonu do pola!');
+            return;
+        }
+        
+        try {
+            // Odkodowanie z Base64 i zamiana tekstu z powrotem na obiekt JSON
+            const decodedString = decodeURIComponent(atob(codeString));
+            const data = JSON.parse(decodedString);
+            
+            // Zastosowanie wczytanych parametrów na panel (korzystamy z istniejącej funkcji)
+            applySettings(data);
+            
+            // Zapis do sesji i zrestartowanie płótna by narysować nowe strefy/dołki
+            saveCurrentSession();
+            btnRestart.click(); 
+            
+            templateCodeInput.value = '';
+            alert('Ustawienia z kodu zostały załadowane\nWpisz nazwę i kliknij "Zapisz jako szablon", jeśli chcesz zapisać je na swojej liście.');
+        } catch(e) {
+            alert('Nieprawidłowy kod szablonu! Upewnij się, że skopiowałeś go w całości.');
+        }
+    });
 
     function updateVisibility() {
         const showAll = cbShowAll.checked;
@@ -180,59 +234,270 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.openZonePopover = function(zone, screenX, screenY) {
-        currentEditingZone = zone;
-        popover.classList.remove('hidden');
+        if (window.activeZonePopovers[zone.id]) return; 
+
+        // Upewniamy się, że nowa strefa ma rejestr dostępu
+        if (!zone.allowedBalls) zone.allowedBalls = [];
+
+        const popover = document.createElement('div');
+        popover.className = 'zone-editor-popover';
         
-        popover.style.left = screenX + 'px';
-        popover.style.top = screenY + 'px'; 
-
-        zeName.value = zone.name;
-        zeColor.value = zone.color;
-        zeStart.value = zone.start;
-        zeEnd.value = zone.end;
-        
-        zeStart.max = window.HOLE_COUNT;
-        zeEnd.max = window.HOLE_COUNT;
-    };
-
-    window.closeZonePopover = function() {
-        popover.classList.add('hidden');
-        currentEditingZone = null;
-    };
-
-    btnZeSave.addEventListener('click', window.closeZonePopover);
-    popover.addEventListener('pointerdown', (e) => e.stopPropagation());
-
-    btnZeDelete.addEventListener('click', () => {
-        if(!currentEditingZone) return;
-        window.ZONES = window.ZONES.filter(z => z.id !== currentEditingZone.id);
-        window.closeZonePopover();
-        saveCurrentSession();
-        if(window.drawPhaserZones) window.drawPhaserZones();
-    });
-
-    [zeName, zeColor, zeStart, zeEnd].forEach(input => {
-        input.addEventListener('input', () => {
-            if(!currentEditingZone) return;
-            currentEditingZone.name = zeName.value;
-            currentEditingZone.color = zeColor.value;
+        popover.innerHTML = `
+            <div class="ze-capacity-indicator" title="Ilość objętych dołków">
+                <span class="ze-capacity-number">${Math.abs(zone.end - zone.start) + 1}</span>
+                <span class="ze-capacity-icon"></span>
+            </div>
+            <div class="ze-close-btn" title="Zamknij">✖</div>
+            <div class="popover-header">Edytuj strefę</div>
+            <input type="text" class="ze-name" placeholder="Nazwa strefy" value="${zone.name}">
+            <div class="ze-row">
+                <input type="color" class="ze-color" title="Kolor strefy" value="${zone.color}">
+                <input type="number" class="ze-start" min="1" max="${window.HOLE_COUNT}" title="Dołek początkowy" value="${zone.start}">
+                <span> - </span>
+                <input type="number" class="ze-end" min="1" max="${window.HOLE_COUNT}" title="Dołek końcowy" value="${zone.end}">
+            </div>
             
-            let s = parseInt(zeStart.value) || 1;
-            let e = parseInt(zeEnd.value) || 1;
+            <div class="ze-access-btn" title="piłki z zaznaczoną nazwą będą mogły wpaść tylko do stref z dostępem">Dostęp... ▼</div>
+            <div class="ze-access-list">
+                <!-- Lista kuleczek generowana z JS -->
+            </div>
+
+            <div class="ze-actions">
+                <button class="ze-save primary-btn">Zapisz / Zamknij</button>
+                <button class="ze-delete danger-btn">Usuń</button>
+            </div>
+        `;
+
+        const applyPopoverColor = (hex) => {
+            let r = parseInt(hex.slice(1, 3), 16);
+            let g = parseInt(hex.slice(3, 5), 16);
+            let b = parseInt(hex.slice(5, 7), 16);
+            
+            let lightR = Math.round(r + (255 - r) * 0.4);
+            let lightG = Math.round(g + (255 - g) * 0.4);
+            let lightB = Math.round(b + (255 - b) * 0.4);
+
+            let luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+            let lumaFactor = luminance / 255; 
+            
+            let greenL = 50 - (lumaFactor * 15); 
+            let greenBorderColor = `hsl(145, 60%, ${greenL}%)`;
+            let greenBgColor = `hsla(145, 60%, ${greenL}%, 0.15)`;
+            
+            let redL = 75 - (lumaFactor * 25);
+            let redColor = `hsl(0, 80%, ${redL}%)`;
+            
+            popover.style.backgroundColor = `rgba(${r}, ${g}, ${b}, 0.4)`;
+            popover.style.borderColor = `rgba(${r}, ${g}, ${b}, 1)`;
+            
+            const header = popover.querySelector('.popover-header');
+            if (header) {
+                header.style.color = `rgb(${lightR}, ${lightG}, ${lightB})`;
+            }
+
+            const capacityIndicator = popover.querySelector('.ze-capacity-indicator');
+            if (capacityIndicator) {
+                capacityIndicator.style.color = `rgb(${lightR}, ${lightG}, ${lightB})`;
+            }
+            
+            const inputs = popover.querySelectorAll('input:not([type="checkbox"])');
+            inputs.forEach(input => {
+                input.style.borderColor = `rgba(${r}, ${g}, ${b}, 1)`;
+            });
+
+            const accessBtn = popover.querySelector('.ze-access-btn');
+            if (accessBtn) {
+                accessBtn.style.borderColor = `rgba(${r}, ${g}, ${b}, 1)`;
+                accessBtn.style.color = `rgb(${lightR}, ${lightG}, ${lightB})`;
+            }
+
+            const saveBtn = popover.querySelector('.ze-save');
+            const deleteBtn = popover.querySelector('.ze-delete');
+            
+            if (saveBtn) {
+                saveBtn.style.backgroundColor = greenBgColor;
+                saveBtn.style.borderColor = greenBorderColor;
+                saveBtn.style.color = greenBorderColor;
+            }
+            
+            if (deleteBtn) {
+                deleteBtn.style.borderColor = redColor;
+                deleteBtn.style.color = redColor;
+                deleteBtn.style.backgroundColor = 'transparent';
+            }
+        };
+        
+        applyPopoverColor(zone.color); 
+
+        // Generowanie listy dostępu (checkboxy) na bazie nazw z głównego panelu
+        const accessListContainer = popover.querySelector('.ze-access-list');
+        const currentBallNames = inputBallNames.value.split('\n').map(n => n.trim()).filter(n => n);
+        
+        if (currentBallNames.length === 0) {
+            accessListContainer.innerHTML = '<span style="color:#a0aab5; font-size:12px;">Brak nazwanych piłeczek w ustawieniach.</span>';
+        } else {
+            currentBallNames.forEach(ballName => {
+                const label = document.createElement('label');
+                const isChecked = zone.allowedBalls.includes(ballName) ? 'checked' : '';
+                label.innerHTML = `<input type="checkbox" value="${ballName}" class="ze-access-checkbox" ${isChecked}> ${ballName}`;
+                
+                label.querySelector('input').addEventListener('change', (e) => {
+                    if(e.target.checked) {
+                        if (!zone.allowedBalls.includes(e.target.value)) zone.allowedBalls.push(e.target.value);
+                    } else {
+                        zone.allowedBalls = zone.allowedBalls.filter(n => n !== e.target.value);
+                    }
+                    saveCurrentSession();
+                });
+                accessListContainer.appendChild(label);
+            });
+        }
+
+        const accessBtn = popover.querySelector('.ze-access-btn');
+        accessBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            accessListContainer.classList.toggle('active');
+        });
+
+        document.getElementById('game-container').appendChild(popover);
+        window.activeZonePopovers[zone.id] = popover;
+
+        let startX = screenX - 130; 
+        let startY = screenY - 180;
+        let maxX = window.innerWidth - 350 - 260 - 15;
+        let maxY = window.innerHeight - 200 - 15;
+        startX = Math.max(15, Math.min(startX, maxX));
+        startY = Math.max(15, Math.min(startY, maxY));
+        
+        popover.style.left = startX + 'px';
+        popover.style.top = startY + 'px';
+
+        const closeBtn = popover.querySelector('.ze-close-btn');
+        const saveBtn = popover.querySelector('.ze-save');
+        const deleteBtn = popover.querySelector('.ze-delete');
+        const inputs = popover.querySelectorAll('input:not([type="checkbox"])');
+
+        const closePopover = () => {
+            popover.remove();
+            delete window.activeZonePopovers[zone.id];
+        };
+
+        closeBtn.addEventListener('click', closePopover);
+        saveBtn.addEventListener('click', closePopover);
+
+        deleteBtn.addEventListener('click', () => {
+            window.ZONES = window.ZONES.filter(z => z.id !== zone.id);
+            closePopover();
+            saveCurrentSession();
+            if(window.drawPhaserZones) window.drawPhaserZones();
+        });
+
+        const updateZone = () => {
+            zone.name = popover.querySelector('.ze-name').value;
+            zone.color = popover.querySelector('.ze-color').value;
+            
+            applyPopoverColor(zone.color);
+            
+            let startInput = popover.querySelector('.ze-start');
+            let endInput = popover.querySelector('.ze-end');
+            
+            if (startInput.value === '' || endInput.value === '') return;
+
+            let s = parseInt(startInput.value) || 1;
+            let e = parseInt(endInput.value) || 1;
             
             if (s > window.HOLE_COUNT) s = window.HOLE_COUNT;
             if (e > window.HOLE_COUNT) e = window.HOLE_COUNT;
             
-            currentEditingZone.start = Math.min(s, e);
-            currentEditingZone.end = Math.max(s, e);
+            let desiredStart = Math.min(s, e);
+            let desiredEnd = Math.max(s, e);
+
+            let rowZones = window.ZONES.filter(z => z.row === zone.row && z.id !== zone.id);
+
+            let leftZones = rowZones.filter(z => z.end < zone.start);
+            let rightZones = rowZones.filter(z => z.start > zone.end);
+
+            let leftBound = 1;
+            if (leftZones.length > 0) {
+                leftBound = Math.max(...leftZones.map(z => z.end)) + 1;
+            }
+
+            let rightBound = window.HOLE_COUNT;
+            if (rightZones.length > 0) {
+                rightBound = Math.min(...rightZones.map(z => z.start)) - 1;
+            }
+
+            zone.start = Math.max(leftBound, Math.min(desiredStart, rightBound));
+            zone.end = Math.max(leftBound, Math.min(desiredEnd, rightBound));
+
+            if (s !== zone.start || e !== zone.end) {
+                startInput.value = zone.start;
+                endInput.value = zone.end;
+            }
+
+            popover.querySelector('.ze-capacity-number').textContent = (zone.end - zone.start) + 1;
 
             saveCurrentSession();
             if(window.drawPhaserZones) window.drawPhaserZones();
+        };
+
+        inputs.forEach(input => {
+            input.addEventListener('input', updateZone);
+            input.addEventListener('mousedown', e => e.stopPropagation());
         });
-    });
+        
+        [saveBtn, deleteBtn, closeBtn, accessListContainer].forEach(btn => btn.addEventListener('mousedown', e => e.stopPropagation()));
+
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        const onMouseMove = (e) => {
+            if (!isDragging) return;
+            let newX = e.clientX - dragOffsetX;
+            let newY = e.clientY - dragOffsetY;
+            
+            let mx = window.innerWidth - 350 - popover.offsetWidth - 15;
+            let my = window.innerHeight - popover.offsetHeight - 15;
+            
+            newX = Math.max(15, Math.min(newX, mx));
+            newY = Math.max(15, Math.min(newY, my));
+            
+            popover.style.left = newX + 'px';
+            popover.style.top = newY + 'px';
+        };
+
+        const onMouseUp = () => {
+            isDragging = false;
+            popover.style.zIndex = 1000;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        popover.addEventListener('mousedown', (e) => {
+            if(['input', 'button', 'span', 'label'].includes(e.target.tagName.toLowerCase()) || e.target.classList.contains('ze-access-btn')) return;
+            
+            isDragging = true;
+            dragOffsetX = e.clientX - popover.getBoundingClientRect().left;
+            dragOffsetY = e.clientY - popover.getBoundingClientRect().top;
+            popover.style.zIndex = 1001; 
+            
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        popover.addEventListener('pointerdown', e => e.stopPropagation());
+        popover.addEventListener('wheel', e => e.stopPropagation());
+    };
 
     btnRestart.addEventListener('click', () => {
-        window.closeZonePopover();
+        if (window.activeZonePopovers) {
+            for (let id in window.activeZonePopovers) {
+                window.activeZonePopovers[id].remove();
+            }
+        }
+        window.activeZonePopovers = {};
+
         saveCurrentSession(); 
 
         window.BALL_COUNT = parseInt(inputBallCount.value);
