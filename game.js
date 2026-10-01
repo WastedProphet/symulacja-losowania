@@ -4,7 +4,7 @@ const BALL_RADIUS = 15;
 const BALL_DIAMETER = BALL_RADIUS * 2; 
 window.BALLS_PER_HOLE = 1;              
 window.BALL_NAMES = []; 
-window.highlightedBallNames = []; // Wielokrotny wybór z menu HTML
+window.highlightedBallNames = []; 
 
 // Globalne zmienne panelu 
 window.MAGNET_ENABLED = true;
@@ -29,7 +29,7 @@ const WORLD_HEIGHT = 2000;
 const config = {
     type: Phaser.WEBGL,
     parent: 'game-container',
-    disableContextMenu: true, // Blokada systemowego menu prawego przycisku myszy
+    disableContextMenu: true, 
     width: window.innerWidth - 350,
     height: window.innerHeight,
     transparent: true,
@@ -410,7 +410,7 @@ function create() {
     // Tworzymy Graphics do maski (dodane bezpośrednio, by zapobiec błędom WebGL)
     let maskGraphics = this.add.graphics();
     maskGraphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    maskGraphics.setVisible(false); // Chowamy przed wzrokiem
+    maskGraphics.setVisible(false); 
     
     let mask = new Phaser.Display.Masks.GeometryMask(this, maskGraphics);
     magnetGraphics.setMask(mask);
@@ -418,9 +418,9 @@ function create() {
     magnetTexts = [];
     for (let i = 0; i < window.HOLE_COUNT; i++) {
         let txt = this.add.text(0, 0, (i + 1).toString(), { 
-            fontSize: '26px', fill: '#2D004D', fontStyle: 'bold' // ZMIANA: Ciemny, głęboki fiolet
+            fontSize: '26px', fill: '#2D004D', fontStyle: 'bold' 
         }).setOrigin(0.5);
-        txt.setDepth(10); // ZMIANA: Przesunięte wyżej, ponad warstwę grafikę pól
+        txt.setDepth(10);
         txt.setVisible(false);
         txt.setMask(mask); 
         magnetTexts.push(txt);
@@ -573,7 +573,6 @@ window.toggleAllGuides = function(state) {
 
 function update(time, delta) {
     
-    // --- KROK 1: SPRZĘŻENIE GRAFIK, PRZEZROCZYSTOŚĆ, PODĄŻANIE TEKSTU ---
     let anyGuideVisible = balls.some(b => b.isGuideVisible);
     let isAnyHighlighted = window.highlightedBallNames && window.highlightedBallNames.length > 0;
 
@@ -619,7 +618,6 @@ function update(time, delta) {
         }
     });
 
-    // --- KROK 2: FIZYKA ROZPYCHAJĄCA NACHODZĄCE ETYKIETY (AABB) ---
     let visibleBalls = balls.filter(b => b.ballName !== '' && b.isGuideVisible && b.guideText.visible);
     
     for(let iter = 0; iter < 3; iter++) {
@@ -668,7 +666,6 @@ function update(time, delta) {
         }
     }
 
-    // --- KROK 3: RYSOWANIE LINII PROWADNIC ---
     visibleBalls.forEach(ball => {
         let angle = Phaser.Math.Angle.Between(ball.x, ball.y, ball.guideText.x, ball.guideText.y);
         let edgeX = ball.x + Math.cos(angle) * BALL_RADIUS;
@@ -781,7 +778,7 @@ function update(time, delta) {
 
         const holeTotalWidth = HOLE_WIDTH + SEPARATOR_WIDTH;
         let timeElapsed = time - phaseTwoStartTime;
-        let currentActivationDist = 55 + (timeElapsed * 0.115); //prędkość rozszerzania się pól przyciągania
+        let currentActivationDist = 55 + (timeElapsed * 0.1); 
         
         let targetedCounts = {}; 
 
@@ -939,7 +936,6 @@ function update(time, delta) {
         });
     }
 
-    // --- NOWE: BEZPIECZNE RYSOWANIE WIZUALIZACJI PÓL MAGNETYCZNYCH ---
     if (magnetGraphics) {
         magnetGraphics.clear();
         
@@ -951,10 +947,9 @@ function update(time, delta) {
             let currentActivationDist = 55;
             
             if (!isPhaseOne && phaseTwoStartTime > 0) {
-                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.115);
+                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.1);
             }
 
-            // NOWE: Obliczamy przekątną całego świata symulacji
             const maxNeededRadius = Math.sqrt(WORLD_WIDTH * WORLD_WIDTH + WORLD_HEIGHT * WORLD_HEIGHT);
 
             if (Object.keys(holeFieldCenters).length === 0) {
@@ -973,29 +968,10 @@ function update(time, delta) {
                 let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].x : targetX;
                 let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].y : targetY;
 
-                // NOWE: Rysujemy okrąg tylko wtedy, gdy nie pokrył jeszcze całego ekranu
                 if (currentActivationDist < maxNeededRadius) {
                     magnetGraphics.fillCircle(fieldX, fieldY, currentActivationDist);
                     magnetGraphics.strokeCircle(fieldX, fieldY, currentActivationDist);
                 }
-
-                if (magnetTexts[i]) {
-                    magnetTexts[i].setPosition(fieldX, fieldY);
-                    magnetTexts[i].setVisible(true);
-                    magnetTexts[i].setScale(1 / mainCamera.zoom);
-                }
-            }
-        }
-
-            for (let i = 0; i < window.HOLE_COUNT; i++) {
-                let targetX = HOLES_OFFSET_X + (i * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
-                let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
-
-                let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].x : targetX;
-                let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].y : targetY;
-
-                magnetGraphics.fillCircle(fieldX, fieldY, currentActivationDist);
-                magnetGraphics.strokeCircle(fieldX, fieldY, currentActivationDist);
 
                 if (magnetTexts[i]) {
                     magnetTexts[i].setPosition(fieldX, fieldY);
