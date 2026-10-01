@@ -418,9 +418,9 @@ function create() {
     magnetTexts = [];
     for (let i = 0; i < window.HOLE_COUNT; i++) {
         let txt = this.add.text(0, 0, (i + 1).toString(), { 
-            fontSize: '26px', fill: '#8A2BE2', fontStyle: 'bold' 
+            fontSize: '26px', fill: '#2D004D', fontStyle: 'bold' // ZMIANA: Ciemny, głęboki fiolet
         }).setOrigin(0.5);
-        txt.setDepth(2);
+        txt.setDepth(10); // ZMIANA: Przesunięte wyżej, ponad warstwę grafikę pól
         txt.setVisible(false);
         txt.setMask(mask); 
         magnetTexts.push(txt);
@@ -781,7 +781,7 @@ function update(time, delta) {
 
         const holeTotalWidth = HOLE_WIDTH + SEPARATOR_WIDTH;
         let timeElapsed = time - phaseTwoStartTime;
-        let currentActivationDist = 55 + (timeElapsed * 0.315); 
+        let currentActivationDist = 55 + (timeElapsed * 0.115); //prędkość rozszerzania się pól przyciągania
         
         let targetedCounts = {}; 
 
@@ -951,8 +951,11 @@ function update(time, delta) {
             let currentActivationDist = 55;
             
             if (!isPhaseOne && phaseTwoStartTime > 0) {
-                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.315);
+                currentActivationDist = 55 + ((time - phaseTwoStartTime) * 0.115);
             }
+
+            // NOWE: Obliczamy przekątną całego świata symulacji
+            const maxNeededRadius = Math.sqrt(WORLD_WIDTH * WORLD_WIDTH + WORLD_HEIGHT * WORLD_HEIGHT);
 
             if (Object.keys(holeFieldCenters).length === 0) {
                 for (let i = 0; i < window.HOLE_COUNT; i++) {
@@ -962,6 +965,27 @@ function update(time, delta) {
                     };
                 }
             }
+
+            for (let i = 0; i < window.HOLE_COUNT; i++) {
+                let targetX = HOLES_OFFSET_X + (i * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
+                let targetY = WORLD_HEIGHT - BALL_RADIUS - 1;
+
+                let fieldX = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].x : targetX;
+                let fieldY = window.SUPER_RANDOM_ENABLED && holeFieldCenters[i] ? holeFieldCenters[i].y : targetY;
+
+                // NOWE: Rysujemy okrąg tylko wtedy, gdy nie pokrył jeszcze całego ekranu
+                if (currentActivationDist < maxNeededRadius) {
+                    magnetGraphics.fillCircle(fieldX, fieldY, currentActivationDist);
+                    magnetGraphics.strokeCircle(fieldX, fieldY, currentActivationDist);
+                }
+
+                if (magnetTexts[i]) {
+                    magnetTexts[i].setPosition(fieldX, fieldY);
+                    magnetTexts[i].setVisible(true);
+                    magnetTexts[i].setScale(1 / mainCamera.zoom);
+                }
+            }
+        }
 
             for (let i = 0; i < window.HOLE_COUNT; i++) {
                 let targetX = HOLES_OFFSET_X + (i * holeTotalWidth) + SEPARATOR_WIDTH + (HOLE_WIDTH / 2);
