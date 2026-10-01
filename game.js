@@ -419,7 +419,7 @@ function create() {
     magnetTexts = [];
     for (let i = 0; i < window.HOLE_COUNT; i++) {
         let txt = this.add.text(0, 0, (i + 1).toString(), { 
-            fontSize: '16px', fill: '#2D004D', fontStyle: 'bold' 
+            fontSize: '16px', fill: '#99FFFF', fontStyle: 'bold' 
         }).setOrigin(0.5);
         txt.setDepth(10);
         txt.setVisible(false);
