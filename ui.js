@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.ZONES = [];
-    window.ALL_GUIDES_ON = false; // Zmienna pamiętająca stan głównego przycisku Oczka
+    window.ALL_GUIDES_ON = false; 
     let currentEditingZone = null;
 
     function loadTemplates() {
@@ -215,7 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.BALLS_PER_HOLE = parseInt(inputBallsPerHole.value);
         window.BALL_NAMES = inputBallNames.value.split('\n').map(n => n.trim()).filter(n => n);
 
-        // ZMIANA: Czysty numer, bez słowa "Dołek"
         resultsList.innerHTML = '';
         for(let i = 0; i < window.HOLE_COUNT; i++) {
             const div = document.createElement('div');
@@ -229,7 +228,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         namesOverlay.innerHTML = '';
 
-        // GENEROWANIE GLOBALNEGO OCZKA (Prowadnice dla wszystkich)
         if (window.BALL_NAMES.length > 0) {
             const globalToggle = document.createElement('div');
             globalToggle.className = 'overlay-name global-eye';
@@ -260,7 +258,6 @@ document.addEventListener('DOMContentLoaded', () => {
             namesOverlay.appendChild(globalToggle);
         }
 
-        // GENEROWANIE POJEDYNCZYCH ELEMENTÓW Z OCZKAMI
         window.BALL_NAMES.forEach((name, idx) => {
             if (!name) return;
             const el = document.createElement('div');
@@ -278,13 +275,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.querySelector('.eye-icon').classList.add('active');
             }
 
-            // Kliknięcie w samo Imię -> Tryb Focus (Zaciemnienie 40%)
             el.querySelector('.name-label').addEventListener('click', (e) => {
                 e.stopPropagation(); 
                 if (window.toggleHighlight) window.toggleHighlight(name);
             });
 
-            // Kliknięcie w Oczko -> Aktywacja jednostkowej Prowadnicy (Linii na ekranie)
             el.querySelector('.eye-icon').addEventListener('click', (e) => {
                 e.stopPropagation();
                 let eye = e.target;
@@ -328,15 +323,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.updateHighlightUI = function(activeName) {
+    window.updateHighlightUI = function(activeNamesArray) {
         document.querySelectorAll('.overlay-name').forEach(el => {
-            // Ignorujemy globalny przycisk
             if (el.classList.contains('global-eye')) return; 
 
-            if (activeName === null) {
+            if (!activeNamesArray || activeNamesArray.length === 0) {
                 el.style.opacity = '1';
                 el.style.color = '#ffffff';
-            } else if (el.dataset.originalName === activeName) {
+            } else if (activeNamesArray.includes(el.dataset.originalName)) {
                 el.style.opacity = '1';
                 el.style.color = '#99FFFF';
             } else {
