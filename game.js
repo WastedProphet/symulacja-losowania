@@ -540,58 +540,112 @@ window.toggleAllGuides = function(state) {
 
 function update(time, delta) {
     
-    // SPRZĘŻENIE GRAFIK DO WŁAŚCIWOŚCI PIŁKI (Uruchamiane zawsze jako pierwsze)
     let anyGuideVisible = balls.some(b => b.isGuideVisible);
 
+    // --- KROK 1: Przezroczystość, obroty obręczy oraz podążanie tekstu za piłką ---
     balls.forEach(ball => {
         if (ball.neonRing) {
             ball.neonRing.setPosition(ball.x, ball.y);
             ball.neonRing.setRotation(ball.rotation);
         }
 
-        // --- DYNAMICZNA PRZEZROCZYSTOŚĆ (Zależna od zaznaczenia oraz włączonych oczek) ---
         if (window.highlightedBallName !== null) {
             let isHighlighted = ball.ballName === window.highlightedBallName;
             ball.setAlpha(isHighlighted ? 1 : 0.08);
             if(ball.neonRing) ball.neonRing.setAlpha(isHighlighted ? 1 : 0.08);
         } else {
             if (anyGuideVisible && ball.ballName === '') {
-                ball.setAlpha(0.08); // Ukryj puste kulki, gdy wyświetlamy prowadnice
+                ball.setAlpha(0.08); 
             } else {
                 ball.setAlpha(1);
             }
             if(ball.neonRing) ball.neonRing.setAlpha(1);
         }
 
-        // --- MATEMATYKA PROWADNIC (Anti-Zoom + Lerp + Trygonometria Krawędzi) ---
         if (ball.ballName !== '' && ball.isGuideVisible) {
             let targetX = ball.x;
             let targetY = ball.y - (55 / mainCamera.zoom); 
 
-            // Płynne doganianie (Smooth Lerp 0.15)
             ball.guideText.x += (targetX - ball.guideText.x) * 0.15;
             ball.guideText.y += (targetY - ball.guideText.y) * 0.15;
             
-            // Stała, czytelna czcionka niezależnie od zooma
             ball.guideText.setScale(1 / mainCamera.zoom);
-
-            let angle = Phaser.Math.Angle.Between(ball.x, ball.y, ball.guideText.x, ball.guideText.y);
-            let edgeX = ball.x + Math.cos(angle) * BALL_RADIUS;
-            let edgeY = ball.y + Math.sin(angle) * BALL_RADIUS;
-
-            ball.guideLine.clear();
-            ball.guideLine.lineStyle(2 / mainCamera.zoom, 0x99FFFF, 0.8);
-            ball.guideLine.beginPath();
-            ball.guideLine.moveTo(edgeX, edgeY);
-            ball.guideLine.lineTo(ball.guideText.x, ball.guideText.y);
-            ball.guideLine.strokePath();
-
-            // Kropka zaczepienia
-            ball.guideLine.fillStyle(0x99FFFF, 1);
-            ball.guideLine.fillCircle(edgeX, edgeY, 3 / mainCamera.zoom);
         } else if (ball.guideLine) {
             ball.guideLine.clear();
         }
+    });
+
+    // --- KROK 2: System "fizyki" rozpychającej nachodzące na siebie etykiety ---
+    let visibleBalls = balls.filter(b => b.ballName !== '' && b.isGuideVisible);
+    
+    // Robimy 3 szybkie pętle (iteracje relaksacji) by tekst zgrabnie się rozsunał, 
+    // nawet gdy bardzo wiele kulek wpadnie w jedno miejsce
+    for(let iter = 0; iter < 3; iter++) {
+        for (let i = 0; i < visibleBalls.length; i++) {
+            for (let j = i + 1; j < visibleBalls.length; j++) {
+                let textA = visibleBalls[i].guideText;
+                let textB = visibleBalls[j].guideText;
+
+                let padding = 10 / mainCamera.zoom; // Odstęp 10px między ramkami (skalowany)
+
+                // Rzeczywista wielkość etykiet na płótnie
+                let wA = (textA.width * textA.scaleX) + padding;
+                let hA = (textA.height * textA.scaleY) + padding;
+                let wB = (textB.width * textB.scaleX) + padding;
+                let hB = (textB.height * textB.scaleY) + padding;
+
+                // Wyliczenie centralnego punktu ramki 
+                // (pamiętaj, że u Ciebie Origin Y tekstu wynosi 1 - czyli dół ramki)
+                let cxA = textA.x;
+                let cyA = textA.y - (hA / 2);
+                let cxB = textB.x;
+                let cyB = textB.y - (hB / 2);
+
+                let dx = cxA - cxB;
+                let dy = cyA - cyB;
+                let absDx = Math.abs(dx);
+                let absDy = Math.abs(dy);
+
+                let minDx = (wA / 2) + (wB / 2);
+                let minDy = (hA / 2) + (hB / 2);
+
+                // Sprawdzamy czy prostokąty na siebie nachodzą (Kolizja)
+                if (absDx < minDx && absDy < minDy) {
+                    let overlapX = minDx - absDx;
+                    let overlapY = minDy - absDy;
+
+                    // Rozsuwamy etykiety najkrótszą możliwą drogą uwolnienia
+                    if (overlapX < overlapY) {
+                        let sign = Math.sign(dx) || 1;
+                        let push = (overlapX / 2) * sign;
+                        textA.x += push;
+                        textB.x -= push;
+                    } else {
+                        let sign = Math.sign(dy) || 1;
+                        let push = (overlapY / 2) * sign;
+                        textA.y += push;
+                        textB.y -= push;
+                    }
+                }
+            }
+        }
+    }
+
+    // --- KROK 3: Rysowanie fizycznych linii do zaktualizowanych pozycji etykiet ---
+    visibleBalls.forEach(ball => {
+        let angle = Phaser.Math.Angle.Between(ball.x, ball.y, ball.guideText.x, ball.guideText.y);
+        let edgeX = ball.x + Math.cos(angle) * BALL_RADIUS;
+        let edgeY = ball.y + Math.sin(angle) * BALL_RADIUS;
+
+        ball.guideLine.clear();
+        ball.guideLine.lineStyle(2 / mainCamera.zoom, 0x99FFFF, 0.8);
+        ball.guideLine.beginPath();
+        ball.guideLine.moveTo(edgeX, edgeY);
+        ball.guideLine.lineTo(ball.guideText.x, ball.guideText.y);
+        ball.guideLine.strokePath();
+
+        ball.guideLine.fillStyle(0x99FFFF, 1);
+        ball.guideLine.fillCircle(edgeX, edgeY, 3 / mainCamera.zoom);
     });
 
     if (isPhaseOne) {
