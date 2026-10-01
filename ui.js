@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsList = document.getElementById('results-list');
     const namesOverlay = document.getElementById('names-overlay');
     const cbShowAll = document.getElementById('cb-show-all');
+    const cbMagnet = document.getElementById('cb-magnet');
+    const cbSuperRandom = document.getElementById('cb-super-random');
     
     const popover = document.getElementById('zone-editor-popover');
     const zeName = document.getElementById('ze-name');
