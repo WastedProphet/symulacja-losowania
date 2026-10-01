@@ -23,6 +23,7 @@ const WORLD_HEIGHT = 2000;
 const config = {
     type: Phaser.WEBGL,
     parent: 'game-container',
+    disableContextMenu: true,
     width: window.innerWidth - 350,
     height: window.innerHeight,
     transparent: true,
